@@ -1,21 +1,62 @@
 import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
+<<<<<<< Updated upstream
 import CameraScreen from './Camera';
 import PhotoGallery from './PhotoGallery';
 import Settings from './Settings';
+=======
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import CameraScreen from './Camera';
+import PhotoGallery from './PhotoGallery';
+import Settings from './Settings';
+import Mapscreen from './Mapscreen';
+
+const TODAY_KEY = 'last_opened_date';
+
+function getTodayString() {
+  const now = new Date();
+  return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+}
+>>>>>>> Stashed changes
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [showSettings, setShowSettings] = useState(false);
+<<<<<<< Updated upstream
+=======
+  const [dailyResetKey, setDailyResetKey] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      const today = getTodayString();
+      const lastOpened = await AsyncStorage.getItem(TODAY_KEY);
+      if (lastOpened !== today) {
+        await AsyncStorage.setItem(TODAY_KEY, today);
+        setDailyResetKey(today);
+      } else {
+        setDailyResetKey(today);
+      }
+    })();
+  }, []);
+>>>>>>> Stashed changes
 
   const navigateTo = (screen) => setCurrentScreen(screen);
   const navigateHome = () => setCurrentScreen('home');
 
+<<<<<<< Updated upstream
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
       
+=======
+  if (!dailyResetKey) return null;
+
+  return (
+    <View style={styles.container}>
+      <StatusBar style="auto" />
+
+>>>>>>> Stashed changes
       <View style={styles.header}>
         <Text style={styles.headerTitle}>League of Puddles</Text>
       </View>
@@ -42,23 +83,47 @@ export default function App() {
       )}
 
       {currentScreen === 'maps' && (
+<<<<<<< Updated upstream
         <View style={styles.screenContainer}>
           <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
             <Text style={styles.sectionTitle}>Maps Section</Text>
             <Text style={styles.screenText}>Maps functionality coming soon...</Text>
           </ScrollView>
+=======
+        <Mapscreen key={dailyResetKey} onBack={navigateHome} />
+      )}
+
+      {currentScreen === 'camera' && (
+        <View style={styles.screenContainer}>
+          <CameraScreen />
+>>>>>>> Stashed changes
           <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
             <Text style={styles.backButtonText}>← Back Home</Text>
           </TouchableOpacity>
         </View>
       )}
 
+<<<<<<< Updated upstream
       {currentScreen === 'camera' && (
         <View style={styles.screenContainer}>
           <CameraScreen />
           <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
             <Text style={styles.backButtonText}>← Back Home</Text>
           </TouchableOpacity>
+=======
+      {currentScreen === 'gallery' && (
+        <View style={styles.screenContainer}>
+          {showSettings ? (
+            <Settings onBack={() => setShowSettings(false)} />
+          ) : (
+            <>
+              <PhotoGallery onOpenSettings={() => setShowSettings(true)} />
+              <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
+                <Text style={styles.backButtonText}>← Back Home</Text>
+              </TouchableOpacity>
+            </>
+          )}
+>>>>>>> Stashed changes
         </View>
       )}
 
