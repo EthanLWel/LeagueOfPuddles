@@ -1,46 +1,82 @@
+import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
 
 export default function App() {
+  const [currentScreen, setCurrentScreen] = useState('home');
+
+  const navigateTo = (screen) => {
+    setCurrentScreen(screen);
+  };
+
+  const navigateHome = () => {
+    setCurrentScreen('home');
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
       
       <View style={styles.header}>
         <Text style={styles.headerTitle}>League of Puddles</Text>
-        <Text style={styles.headerSubtitle}>React Native + Expo App</Text>
       </View>
 
-      <ScrollView style={styles.content}>
-        <Text style={styles.sectionTitle}>Welcome! 🎉</Text>
-        
-        <View style={styles.featureCard}>
-          <Text style={styles.featureTitle}>📍 GPS / Location</Text>
-          <Text style={styles.featureDescription}>Access device location and track movement</Text>
-        </View>
+      {currentScreen === 'home' && (
+        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+          <Text style={styles.sectionTitle}>Welcome! 🎉</Text>
 
-        <View style={styles.featureCard}>
-          <Text style={styles.featureTitle}>🗺️ Maps</Text>
-          <Text style={styles.featureDescription}>Display interactive maps with markers and routes</Text>
-        </View>
+          <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('maps')}>
+            <Text style={styles.featureTitle}>Maps</Text>
+            <Text style={styles.featureDescription}>Display interactive maps with markers and routes</Text>
+          </TouchableOpacity>
 
-        <View style={styles.featureCard}>
-          <Text style={styles.featureTitle}>📸 Camera</Text>
-          <Text style={styles.featureDescription}>Take photos and videos</Text>
-        </View>
+          <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('camera')}>
+            <Text style={styles.featureTitle}>Camera</Text>
+            <Text style={styles.featureDescription}>Take photos and videos</Text>
+          </TouchableOpacity>
 
-        <View style={styles.featureCard}>
-          <Text style={styles.featureTitle}>🔔 Notifications</Text>
-          <Text style={styles.featureDescription}>Send push notifications to users</Text>
-        </View>
+          <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('settings')}>
+            <Text style={styles.featureTitle}>Settings</Text>
+            <Text style={styles.featureDescription}>Send push notifications to users</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
 
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>✨ Getting Started</Text>
-          <Text style={styles.infoText}>
-            Install packages: expo-location, react-native-maps, expo-camera, expo-notifications
-          </Text>
+      {currentScreen === 'maps' && (
+        <View style={styles.screenContainer}>
+          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <Text style={styles.sectionTitle}>Maps Section</Text>
+            <Text style={styles.screenText}>Maps functionality coming soon...</Text>
+          </ScrollView>
+          <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
+            <Text style={styles.backButtonText}>← Back Home</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
+      )}
+
+      {currentScreen === 'camera' && (
+        <View style={styles.screenContainer}>
+          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <Text style={styles.sectionTitle}>Camera Section</Text>
+            <Text style={styles.screenText}>Camera functionality coming soon...</Text>
+          </ScrollView>
+          <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
+            <Text style={styles.backButtonText}>← Back Home</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {currentScreen === 'settings' && (
+        <View style={styles.screenContainer}>
+          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <Text style={styles.sectionTitle}>Settings Section</Text>
+            <Text style={styles.screenText}>Settings functionality coming soon...</Text>
+          </ScrollView>
+          <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
+            <Text style={styles.backButtonText}>← Back Home</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -67,11 +103,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 5,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#e0e8f0',
-  },
   content: {
+    flex: 1,
+  },
+  screenContainer: {
     flex: 1,
   },
   contentContainer: {
@@ -105,23 +140,22 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 20,
   },
-  infoBox: {
-    backgroundColor: '#fff9e6',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#ffc107',
+  screenText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 20,
   },
-  infoTitle: {
+  backButton: {
+    backgroundColor: '#4A90E2',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    margin: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#555',
-    lineHeight: 22,
   },
 });
