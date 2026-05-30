@@ -3,9 +3,11 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
 import CameraScreen from './Camera';
 import PhotoGallery from './PhotoGallery';
+import Settings from './Settings';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
+  const [showSettings, setShowSettings] = useState(false);
 
   const navigateTo = (screen) => setCurrentScreen(screen);
   const navigateHome = () => setCurrentScreen('home');
@@ -36,11 +38,6 @@ export default function App() {
             <Text style={styles.featureTitle}>Profile</Text>
             <Text style={styles.featureDescription}>View, download, or delete your saved photos</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('settings')}>
-            <Text style={styles.featureTitle}>Settings</Text>
-            <Text style={styles.featureDescription}>Send push notifications to users</Text>
-          </TouchableOpacity>
         </ScrollView>
       )}
 
@@ -67,22 +64,16 @@ export default function App() {
 
       {currentScreen === 'gallery' && (
         <View style={styles.screenContainer}>
-          <PhotoGallery />
-          <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
-            <Text style={styles.backButtonText}>← Back Home</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {currentScreen === 'settings' && (
-        <View style={styles.screenContainer}>
-          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-            <Text style={styles.sectionTitle}>Settings Section</Text>
-            <Text style={styles.screenText}>Settings functionality coming soon...</Text>
-          </ScrollView>
-          <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
-            <Text style={styles.backButtonText}>← Back Home</Text>
-          </TouchableOpacity>
+          {showSettings ? (
+            <Settings onBack={() => setShowSettings(false)} />
+          ) : (
+            <>
+              <PhotoGallery onOpenSettings={() => setShowSettings(true)} />
+              <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
+                <Text style={styles.backButtonText}>← Back Home</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       )}
     </View>

@@ -8,7 +8,7 @@ import { getSavedPhotos, deletePhoto, downloadToGallery } from './photoStorage';
 
 const THUMB = Dimensions.get('window').width / 3 - 4;
 
-export default function PhotoGallery() {
+export default function PhotoGallery({ onOpenSettings}) {
   const [photos, setPhotos] = useState([]);
 
   useEffect(() => {
@@ -46,6 +46,13 @@ export default function PhotoGallery() {
   }
 
   return (
+    <View style={{ flex: 1 }}>
+        <View style={galleryStyles.header}>
+        <Text style={galleryStyles.headerTitle}>Profile</Text>
+        <TouchableOpacity onPress={onOpenSettings}>
+            <Text style={galleryStyles.menuIcon}>☰</Text>
+        </TouchableOpacity>
+    </View>
     <FlatList
       data={photos}
       keyExtractor={item => item.uri}
@@ -65,6 +72,7 @@ export default function PhotoGallery() {
         </View>
       )}
     />
+    </View>
   );
 }
 
@@ -84,4 +92,25 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 14 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { color: '#888', fontSize: 16 }
+});
+
+const galleryStyles = StyleSheet.create({
+  header: {
+    backgroundColor: '#4A90E2',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  menuIcon: {
+    fontSize: 24,
+    color: 'white',
+  },
 });
