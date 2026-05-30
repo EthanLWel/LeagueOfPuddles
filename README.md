@@ -1,4 +1,6 @@
 # League of Puddles
+scarlett only - Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
 
 A React Native + Expo mobile app built with JavaScript/TypeScript.
 

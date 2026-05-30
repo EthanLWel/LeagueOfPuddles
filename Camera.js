@@ -1,23 +1,62 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Image, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Linking, StyleSheet, PanResponder } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
+import { savePhoto } from './photoStorage';
 
 export default function CameraScreen() {
   const [facing, setFacing] = useState('back');
   const [permission, requestPermission] = useCameraPermissions();
-  const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
+  const [mediaPermission] = MediaLibrary.usePermissions();
   const [photoUri, setPhotoUri] = useState(null);
+  const [zoom, setZoom] = useState(0.1);
   const cameraRef = useRef(null);
+  const lastZoom = useRef(0);
+  const lastDistance = useRef(null);
+
+  const getDistance = (touches) => {
+    const [a, b] = touches;
+    const dx = a.pageX - b.pageX;
+    const dy = a.pageY - b.pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const pinchResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (e) => e.nativeEvent.touches.length === 2,
+      onMoveShouldSetPanResponder: (e) => e.nativeEvent.touches.length === 2,
+      onPanResponderGrant: (e) => {
+        if (e.nativeEvent.touches.length === 2) {
+          lastDistance.current = getDistance(e.nativeEvent.touches);
+        }
+      },
+      onPanResponderMove: (e) => {
+        if (e.nativeEvent.touches.length !== 2) return;
+        const dist = getDistance(e.nativeEvent.touches);
+        if (lastDistance.current === null) {
+          lastDistance.current = dist;
+          return;
+        }
+        const delta = (dist - lastDistance.current) / 400;
+        lastDistance.current = dist;
+        setZoom(prev => {
+          const next = Math.min(1, Math.max(0, prev + delta));
+          lastZoom.current = next;
+          return next;
+        });
+      },
+      onPanResponderRelease: () => {
+        lastDistance.current = null;
+      },
+    })
+  ).current;
 
   const takePicture = async () => {
     if (!cameraRef.current) return;
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8, exif: false });
+      await savePhoto(photo.uri);
       setPhotoUri(photo.uri);
-      if (mediaPermission?.granted) {
-        await MediaLibrary.createAssetAsync(photo.uri);
-      }
     } catch (e) {
       console.error('takePicture error', e);
     }
@@ -39,9 +78,38 @@ export default function CameraScreen() {
     );
   }
 
+  const zoomLabel = zoom < 0.0075 ? '0.5×' : zoom < 0.05 ? '1×' : '2×';
+
   return (
     <View style={{ flex: 1 }}>
-      <CameraView style={{ flex: 1 }} facing={facing} ref={cameraRef} ratio="16:9" />
+      <CameraView style={{ flex: 1 }} facing={facing} ref={cameraRef} ratio="16:9" zoom={zoom} />
+
+      {/* Pinch overlay */}
+      <View style={StyleSheet.absoluteFill} {...pinchResponder.panHandlers} pointerEvents="box-only" />
+
+      {/* Zoom indicator */}
+      <View style={styles.zoomIndicator}>
+        <Text style={styles.zoomLabel}>{zoomLabel}</Text>
+        <View style={styles.zoomBarTrack}>
+          <View style={[styles.zoomBarFill, { width: `${zoom * 100}%` }]} />
+        </View>
+      </View>
+
+      {/* Zoom buttons */}
+      <View style={styles.zoomContainer}>
+        {[0, 0.1, 0.2].map((level) => (
+          <TouchableOpacity
+            key={level}
+            onPress={() => setZoom(level)}
+            style={[styles.zoomBtn, zoom === level && styles.zoomBtnActive]}
+          >
+            <Text style={[styles.zoomText, zoom === level && styles.zoomTextActive]}>
+              {level === 0 ? '0.5×' : level === 0.1 ? '1×' : '2×'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <View style={{ position: 'absolute', bottom: 40, width: '100%', alignItems: 'center' }}>
         <TouchableOpacity onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
           <Text style={{ color: 'white', fontSize: 18, marginBottom: 8 }}>Flip</Text>
@@ -50,9 +118,68 @@ export default function CameraScreen() {
           <Text>Take Photo</Text>
         </TouchableOpacity>
       </View>
+
       {photoUri && (
         <Image source={{ uri: photoUri }} style={{ width: 100, height: 100, position: 'absolute', right: 10, top: 10 }} />
       )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  zoomIndicator: {
+    position: 'absolute',
+    top: 16,
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  zoomLabel: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  zoomBarTrack: {
+    width: 120,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  zoomBarFill: {
+    height: '100%',
+    backgroundColor: 'white',
+    borderRadius: 2,
+  },
+  zoomContainer: {
+    position: 'absolute',
+    bottom: 110,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  zoomBtn: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  zoomBtnActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'white',
+  },
+  zoomText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  zoomTextActive: {
+    color: 'white',
+  },
+});

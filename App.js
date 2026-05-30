@@ -2,17 +2,13 @@ import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
 import CameraScreen from './Camera';
+import PhotoGallery from './PhotoGallery';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
 
-  const navigateTo = (screen) => {
-    setCurrentScreen(screen);
-  };
-
-  const navigateHome = () => {
-    setCurrentScreen('home');
-  };
+  const navigateTo = (screen) => setCurrentScreen(screen);
+  const navigateHome = () => setCurrentScreen('home');
 
   return (
     <View style={styles.container}>
@@ -34,6 +30,11 @@ export default function App() {
           <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('camera')}>
             <Text style={styles.featureTitle}>Camera</Text>
             <Text style={styles.featureDescription}>Take photos and videos</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('gallery')}>
+            <Text style={styles.featureTitle}>Profile</Text>
+            <Text style={styles.featureDescription}>View, download, or delete your saved photos</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('settings')}>
@@ -58,6 +59,15 @@ export default function App() {
       {currentScreen === 'camera' && (
         <View style={styles.screenContainer}>
           <CameraScreen />
+          <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
+            <Text style={styles.backButtonText}>← Back Home</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {currentScreen === 'gallery' && (
+        <View style={styles.screenContainer}>
+          <PhotoGallery />
           <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
             <Text style={styles.backButtonText}>← Back Home</Text>
           </TouchableOpacity>
