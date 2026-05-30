@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
+import CameraScreen from './Camera';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
@@ -56,10 +57,7 @@ export default function App() {
 
       {currentScreen === 'camera' && (
         <View style={styles.screenContainer}>
-          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-            <Text style={styles.sectionTitle}>Camera Section</Text>
-            <Text style={styles.screenText}>Camera functionality coming soon...</Text>
-          </ScrollView>
+          <CameraScreen />
           <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
             <Text style={styles.backButtonText}>← Back Home</Text>
           </TouchableOpacity>
