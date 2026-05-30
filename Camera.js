@@ -97,21 +97,37 @@ export default function CameraScreen() {
 
       {/* Zoom buttons */}
       <View style={styles.zoomContainer}>
-        {[0, 0.1, 0.2].map((level) => (
-          <TouchableOpacity
-            key={level}
-            onPress={() => setZoom(level)}
-            style={[styles.zoomBtn, zoom === level && styles.zoomBtnActive]}
-          >
-            <Text style={[styles.zoomText, zoom === level && styles.zoomTextActive]}>
-              {level === 0 ? '0.5×' : level === 0.1 ? '1×' : '2×'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {[0, 0.1, 0.2].map((level) => {
+          const isFront = facing === 'front';
+          const isUltrawide = level === 0;
+          const disabled = isFront && isUltrawide;
+          const frontZoom = level === 0 ? null : level === 0.1 ? 0 : 0.1;
+          const actualZoom = isFront ? frontZoom : level;
+          const label = level === 0 ? '0.5×' : level === 0.1 ? '1×' : '2×';
+
+          return (
+            <TouchableOpacity
+              key={level}
+              onPress={() => !disabled && setZoom(actualZoom)}
+              style={[styles.zoomBtn, zoom === actualZoom && styles.zoomBtnActive, disabled && styles.zoomBtnDisabled]}
+            >
+              <Text style={[styles.zoomText, zoom === actualZoom && styles.zoomTextActive, disabled && styles.zoomTextDisabled]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <View style={{ position: 'absolute', bottom: 40, width: '100%', alignItems: 'center' }}>
-        <TouchableOpacity onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
+        <TouchableOpacity onPress={() => {
+          setFacing(f => {
+            const next = f === 'back' ? 'front' : 'back';
+            if (next === 'front') setZoom(0);
+            else setZoom(0.1);
+            return next;
+          });
+        }}>
           <Text style={{ color: 'white', fontSize: 18, marginBottom: 8 }}>Flip</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={takePicture} style={{ backgroundColor: 'white', padding: 12, borderRadius: 40 }}>
@@ -173,6 +189,12 @@ const styles = StyleSheet.create({
   zoomBtnActive: {
     backgroundColor: 'rgba(255,255,255,0.25)',
     borderColor: 'white',
+  },
+  zoomBtnDisabled: {
+    opacity: 0.3,
+  },
+  zoomTextDisabled: {
+    color: 'rgba(255,255,255,0.3)',
   },
   zoomText: {
     color: 'rgba(255,255,255,0.7)',
