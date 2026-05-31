@@ -193,33 +193,22 @@ export default function CameraScreen() {
       <View style={StyleSheet.absoluteFill} {...pinchResponder.panHandlers} pointerEvents="box-only" />
 
       {Platform.OS !== 'web' && (
-        <View style={styles.zoomIndicator}>
-          <Text style={styles.zoomLabel}>{zoomLabel}</Text>
-          <View style={styles.zoomBarTrack}>
-            <View style={[styles.zoomBarFill, { width: `${zoom * 100}%` }]} />
-          </View>
-        </View>
-      )}
-
-      {Platform.OS !== 'web' && (
         <View style={styles.zoomContainer}>
-          {[0, 0.1, 0.2].map((level) => {
+          {[0.1, 0.2].map((level) => {
             const isFront = facing === 'front';
-            const isUltrawide = level === 0;
-            const disabled = isFront && isUltrawide;
-            // For front camera, 1× = zoom 0, 2× = zoom 0.1 (same as before)
-            // For back camera, ultrawide uses ultrawideZoom (-1 Android, 0 iOS)
+            // For front camera: 1× = zoom 0, 2× = zoom 0.1
+            // For back camera: 1× = zoom 0.1, 2× = zoom 0.2
             const actualZoom = isFront
-              ? (level === 0 ? null : level === 0.1 ? 0 : 0.1)
-              : (level === 0 ? ultrawideZoom : level);
-            const label = level === 0 ? '0.5×' : level === 0.1 ? '1×' : '2×';
+              ? (level === 0.1 ? 0 : 0.1)
+              : level;
+            const label = level === 0.1 ? '1×' : '2×';
             return (
               <TouchableOpacity
                 key={level}
-                onPress={() => !disabled && setZoom(actualZoom)}
-                style={[styles.zoomBtn, zoom === actualZoom && styles.zoomBtnActive, disabled && styles.zoomBtnDisabled]}
+                onPress={() => setZoom(actualZoom)}
+                style={[styles.zoomBtn, zoom === actualZoom && styles.zoomBtnActive]}
               >
-                <Text style={[styles.zoomText, zoom === actualZoom && styles.zoomTextActive, disabled && styles.zoomTextDisabled]}>
+                <Text style={[styles.zoomText, zoom === actualZoom && styles.zoomTextActive]}>
                   {label}
                 </Text>
               </TouchableOpacity>
