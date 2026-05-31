@@ -286,7 +286,7 @@ export default function HomeFeed() {
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <View style={styles.headerSideBtn} />
-            <Image source={require('./waddl/Pretty/Top_logo.png')} style={styles.logo} resizeMode="contain" />
+            <Image source={require('./waddl/Prettier/New_name.png')} style={styles.logo} resizeMode="contain" />
             <View style={styles.headerSideBtn} />
           </View>
         </View>
@@ -308,15 +308,19 @@ export default function HomeFeed() {
             onPress={() => setSearchOpen(true)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.headerIcon}>🔍</Text>
+            <Image source={require('./waddl/Prettier/Search.png')} style={styles.headerIconImg} resizeMode="contain" />
           </TouchableOpacity>
-          <Image source={require('./waddl/Pretty/Top_logo.png')} style={styles.logo} resizeMode="contain" />
+          <Image source={require('./waddl/Prettier/New_name.png')} style={styles.logo} resizeMode="contain" />
           <TouchableOpacity
             style={styles.headerSideBtn}
             onPress={() => setInboxOpen(true)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.headerIcon}>📬</Text>
+            <Image 
+              source={require('./waddl/Prettier/Mail.png')} 
+              style={styles.headerIconImg} 
+              resizeMode="contain" 
+            />
             {inboxRequests.length > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{inboxRequests.length}</Text>
@@ -372,14 +376,14 @@ export default function HomeFeed() {
         onRequestClose={() => { setSearchOpen(false); setSearchQuery(''); }}
       >
         <KeyboardAvoidingView
-          style={styles.modalOverlay}
+          style={styles.modalOverlayNoBg}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.modalSheet}>
+          <View style={styles.modalSheetFullScreen}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Find Friends</Text>
               <TouchableOpacity onPress={() => { setSearchOpen(false); setSearchQuery(''); }}>
-                <Text style={styles.modalClose}>✕</Text>
+                <Image source={require('./waddl/Prettier/X-Out.png')} style={styles.closeIcon} resizeMode="contain" />
               </TouchableOpacity>
             </View>
 
@@ -438,18 +442,18 @@ export default function HomeFeed() {
         transparent
         onRequestClose={() => setInboxOpen(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+        <View style={styles.modalOverlayNoBg}>
+          <View style={styles.modalSheetFullScreen}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Friend Requests</Text>
               <TouchableOpacity onPress={() => setInboxOpen(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <Image source={require('./waddl/Prettier/X-Out.png')} style={styles.closeIcon} resizeMode="contain" />
               </TouchableOpacity>
             </View>
 
             {inboxRequests.length === 0 ? (
               <View style={styles.searchPrompt}>
-                <Text style={styles.emptyInboxIcon}>📭</Text>
+                <Image source={require('./waddl/Prettier/No_mail.png')} style={styles.emptyInboxImage} resizeMode="contain" />
                 <Text style={styles.searchPromptText}>No pending requests</Text>
               </View>
             ) : (
@@ -593,12 +597,23 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 20,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerSideBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  headerSideBtn: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
   headerIcon: { fontSize: 24 },
-  logo: { height: 60, width: 180 },
+  headerIconImg: { width: 50, height: 50 },
+  mailIconBg: { 
+    width: 70, 
+    height: 70, 
+    borderRadius: 35, 
+    backgroundColor: '#fff', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    padding: 8,
+  },
+  mailIconImg: { width: 54, height: 54 },
+  logo: { height: 90, width: 240 },
 
   badge: {
-    position: 'absolute', top: 4, right: 4,
+    position: 'absolute', top: 8, right: 8,
     backgroundColor: '#e63946',
     borderRadius: 10, minWidth: 18, height: 18,
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3,
@@ -626,15 +641,23 @@ const styles = StyleSheet.create({
   emptySubtext: { fontSize: 16, fontFamily: 'LilitaOne_400Regular', color: '#999', textAlign: 'center' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalOverlayNoBg: { flex: 1, justifyContent: 'flex-end', paddingTop: 150 },
   modalSheet: {
     backgroundColor: '#e4e1d3',
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40,
     maxHeight: '80%',
   },
+  modalSheetFullScreen: {
+    backgroundColor: '#e4e1d3',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40,
+    flex: 1,
+  },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 20, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
   modalClose: { fontSize: 22, color: '#29412c', fontFamily: 'LilitaOne_400Regular' },
+  closeIcon: { width: 24, height: 24 },
   searchInput: {
     backgroundColor: '#fff', borderRadius: 12,
     paddingVertical: 12, paddingHorizontal: 16,
@@ -644,6 +667,7 @@ const styles = StyleSheet.create({
   searchPrompt: { alignItems: 'center', paddingTop: 30, gap: 12 },
   searchPromptText: { fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#999' },
   emptyInboxIcon: { fontSize: 48 },
+  emptyInboxImage: { width: 250, height: 250 },
   resultsList: { maxHeight: 400 },
   resultRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#d0cdb8' },
   resultPic: {

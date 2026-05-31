@@ -192,7 +192,7 @@ export default function MapScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Image
-          source={require('./waddl/Pretty/Top_logo.png')}
+          source={require('./waddl/Prettier/New_name.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  logo: { height: 100, width: 300 },
+  logo: { height: 90, width: 240 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { fontSize: 16, fontFamily: 'LilitaOne_400Regular', color: '#666' },
   errorBanner: { backgroundColor: '#fff3cd', paddingVertical: 8, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#ffc107' },

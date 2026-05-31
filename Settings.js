@@ -143,7 +143,7 @@ export default function Settings({ onBack, onLogout, user }) {
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Image
-          source={require('./waddl/Pretty/Top_logo.png')}
+          source={require('./waddl/Prettier/New_name.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 60 },
   backText: { color: 'white', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
-  logo: { height: 100, width: 300 },
+  logo: { height: 90, width: 240 },
   placeholder: { width: 60 },
   scrollContent: { paddingBottom: 40 },
   profileSection: { alignItems: 'center', marginTop: 24, marginBottom: 8, gap: 6 },
