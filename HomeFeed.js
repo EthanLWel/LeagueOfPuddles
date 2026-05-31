@@ -30,12 +30,10 @@ export default function HomeFeed() {
   const [inboxOpen, setInboxOpen] = useState(false);
   const [inboxRequests, setInboxRequests] = useState([]);
 
-  // Profile page state
-  const [profilePage, setProfilePage] = useState(null); // { uid, username, bio }
+  const [profilePage, setProfilePage] = useState(null);
   const [profilePhotos, setProfilePhotos] = useState([]);
   const [profilePhotosLoading, setProfilePhotosLoading] = useState(false);
 
-  // Post tap modal (from feed)
   const [profileModal, setProfileModal] = useState(null);
 
   const unsubInboxRef = useRef(null);
@@ -106,6 +104,15 @@ export default function HomeFeed() {
       await Promise.all(
         allUsers.map(async (user) => {
           try {
+            // Fetch pfpUrl from Firestore user doc
+            let pfpUrl = user.pfpUrl ?? null;
+            if (!pfpUrl) {
+              try {
+                const userDoc = await getDoc(doc(db, 'users', user.uid));
+                if (userDoc.exists()) pfpUrl = userDoc.data().pfpUrl ?? null;
+              } catch (e) {}
+            }
+
             const userPhotosRef = ref(storage, `photos/${user.uid}/`);
             const result = await listAll(userPhotosRef);
             const urls = await Promise.all(
@@ -116,6 +123,7 @@ export default function HomeFeed() {
                   imageUrl: url,
                   username: user.username || 'unknown',
                   uid: user.uid,
+                  pfpUrl,
                   timestamp: parseInt(item.name.replace('.jpg', '')) || 0,
                   isFriend: friends.includes(user.uid),
                 };
@@ -159,7 +167,6 @@ export default function HomeFeed() {
     setProfilePage(user);
     setProfilePhotos([]);
     loadProfilePhotos(user.uid);
-    // close search
     setSearchOpen(false);
     setSearchQuery('');
   };
@@ -316,10 +323,10 @@ export default function HomeFeed() {
             onPress={() => setInboxOpen(true)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Image 
-              source={require('./waddl/Prettier/Mail.png')} 
-              style={styles.headerIconImg} 
-              resizeMode="contain" 
+            <Image
+              source={require('./waddl/Prettier/Mail.png')}
+              style={styles.headerIconImg}
+              resizeMode="contain"
             />
             {inboxRequests.length > 0 && (
               <View style={styles.badge}>
@@ -347,13 +354,17 @@ export default function HomeFeed() {
             <View key={post.id} style={styles.post}>
               <TouchableOpacity
                 style={styles.postHeader}
-                onPress={() => setProfileModal({ uid: post.uid, username: post.username })}
+                onPress={() => setProfileModal({ uid: post.uid, username: post.username, pfpUrl: post.pfpUrl })}
                 activeOpacity={0.7}
               >
                 <View style={styles.profilePic}>
-                  <Text style={styles.profileInitial}>
-                    {(post.username || '?')[0].toUpperCase()}
-                  </Text>
+                  {post.pfpUrl ? (
+                    <Image source={{ uri: post.pfpUrl }} style={styles.profilePicImage} resizeMode="cover" />
+                  ) : (
+                    <Text style={styles.profileInitial}>
+                      {(post.username || '?')[0].toUpperCase()}
+                    </Text>
+                  )}
                 </View>
                 <Text style={styles.username}>@{post.username}</Text>
                 {post.isFriend && (
@@ -416,9 +427,13 @@ export default function HomeFeed() {
                     activeOpacity={0.7}
                   >
                     <View style={styles.resultPic}>
-                      <Text style={styles.resultInitial}>
-                        {(user.username || '?')[0].toUpperCase()}
-                      </Text>
+                      {user.pfpUrl ? (
+                        <Image source={{ uri: user.pfpUrl }} style={styles.resultPicImage} resizeMode="cover" />
+                      ) : (
+                        <Text style={styles.resultInitial}>
+                          {(user.username || '?')[0].toUpperCase()}
+                        </Text>
+                      )}
                     </View>
                     <View style={styles.resultInfo}>
                       <Text style={styles.resultUsername}>@{user.username}</Text>
@@ -492,7 +507,6 @@ export default function HomeFeed() {
         onRequestClose={closeProfilePage}
       >
         <View style={styles.profilePageContainer}>
-          {/* Back header */}
           <View style={styles.profilePageHeader}>
             <TouchableOpacity onPress={closeProfilePage} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Text style={styles.backBtnText}>← Back</Text>
@@ -502,12 +516,15 @@ export default function HomeFeed() {
           </View>
 
           <ScrollView contentContainerStyle={styles.profilePageContent}>
-            {/* Avatar + info */}
             <View style={styles.profilePageTop}>
               <View style={styles.profilePageAvatar}>
-                <Text style={styles.profilePageInitial}>
-                  {(profilePage?.username || '?')[0].toUpperCase()}
-                </Text>
+                {profilePage?.pfpUrl ? (
+                  <Image source={{ uri: profilePage.pfpUrl }} style={styles.profilePageAvatarImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.profilePageInitial}>
+                    {(profilePage?.username || '?')[0].toUpperCase()}
+                  </Text>
+                )}
               </View>
               <Text style={styles.profilePageUsername}>@{profilePage?.username}</Text>
               {profilePage?.bio ? (
@@ -518,7 +535,6 @@ export default function HomeFeed() {
               </View>
             </View>
 
-            {/* Photo grid */}
             <View style={styles.profilePageDivider} />
             {profilePhotosLoading ? (
               <View style={styles.profilePhotosLoading}>
@@ -557,9 +573,13 @@ export default function HomeFeed() {
             </View>
             <View style={styles.profileModalBody}>
               <View style={styles.profileModalAvatar}>
-                <Text style={styles.profileModalInitial}>
-                  {(profileModal?.username || '?')[0].toUpperCase()}
-                </Text>
+                {profileModal?.pfpUrl ? (
+                  <Image source={{ uri: profileModal.pfpUrl }} style={styles.profileModalAvatarImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.profileModalInitial}>
+                    {(profileModal?.username || '?')[0].toUpperCase()}
+                  </Text>
+                )}
               </View>
               {profileModal && (
                 <View style={{ marginTop: 16 }}>
@@ -600,16 +620,6 @@ const styles = StyleSheet.create({
   headerSideBtn: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
   headerIcon: { fontSize: 24 },
   headerIconImg: { width: 50, height: 50 },
-  mailIconBg: { 
-    width: 70, 
-    height: 70, 
-    borderRadius: 35, 
-    backgroundColor: '#fff', 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    padding: 8,
-  },
-  mailIconImg: { width: 54, height: 54 },
   logo: { height: 90, width: 240 },
 
   badge: {
@@ -628,7 +638,9 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: '#29412c',
     justifyContent: 'center', alignItems: 'center', marginRight: 10,
+    overflow: 'hidden',
   },
+  profilePicImage: { width: '100%', height: '100%' },
   profileInitial: { fontSize: 18, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
   username: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#29412c', flex: 1 },
   friendBadge: { backgroundColor: '#29412c', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
@@ -674,7 +686,9 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: '#29412c',
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
+    overflow: 'hidden',
   },
+  resultPicImage: { width: '100%', height: '100%' },
   resultInitial: { fontSize: 20, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
   resultInfo: { flex: 1 },
   resultUsername: { fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
@@ -703,7 +717,6 @@ const styles = StyleSheet.create({
   },
   declineBtnText: { color: '#e63946', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
 
-  // ── Full profile page ────────────────────────────────────────────
   profilePageContainer: { flex: 1, backgroundColor: '#e4e1d3' },
   profilePageHeader: {
     backgroundColor: '#29412c',
@@ -725,8 +738,9 @@ const styles = StyleSheet.create({
     width: 90, height: 90, borderRadius: 45,
     backgroundColor: '#29412c',
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 12, overflow: 'hidden',
   },
+  profilePageAvatarImage: { width: '100%', height: '100%' },
   profilePageInitial: { fontSize: 40, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
   profilePageUsername: { fontSize: 22, fontFamily: 'LilitaOne_400Regular', color: '#29412c', marginBottom: 6 },
   profilePageBio: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#666', textAlign: 'center', lineHeight: 20 },
@@ -740,13 +754,14 @@ const styles = StyleSheet.create({
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   gridPhoto: { width: Math.floor((width - 12) / 3), height: Math.floor((width - 12) / 3), margin: 2 },
 
-  // ── Feed post tap mini-modal ─────────────────────────────────────
   profileModalBody: { alignItems: 'center', paddingVertical: 20 },
   profileModalAvatar: {
     width: 80, height: 80, borderRadius: 40,
     backgroundColor: '#29412c',
     justifyContent: 'center', alignItems: 'center',
+    overflow: 'hidden',
   },
+  profileModalAvatarImage: { width: '100%', height: '100%' },
   profileModalInitial: { fontSize: 36, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
   viewProfileBtn: { marginTop: 14 },
   viewProfileBtnText: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
