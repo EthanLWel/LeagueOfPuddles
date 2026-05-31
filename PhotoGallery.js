@@ -119,7 +119,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
             }}
           >
             <Text style={galleryStyles.bio}>{bio}</Text>
-            <Text style={galleryStyles.bioEditHint}>✏️ tap to edit</Text>
           </TouchableOpacity>
         )}
       </View>
