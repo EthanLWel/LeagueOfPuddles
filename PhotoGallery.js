@@ -8,6 +8,9 @@ import { ref, deleteObject, listAll, getDownloadURL } from 'firebase/storage';
 import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, storage, db } from './firebase';
 
+// Only import react-native-maps on native — never on web
+const RouteMapNative = Platform.OS !== 'web' ? require('./RouteMapNative').default : null;
+
 const THUMB = Dimensions.get('window').width / 3 - 4;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAthF2hGgMDjU9ip9T_jzBiJifp2N8E6w0';
@@ -39,28 +42,10 @@ function RouteMapSlide({ route }) {
     );
   }
 
-  const MapView = require('react-native-maps').default;
-  const { Polyline, Marker } = require('react-native-maps');
-  const lats = route.map(p => p.latitude ?? p.lat);
-  const lngs = route.map(p => p.longitude ?? p.lng);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-  const region = {
-    latitude: (minLat + maxLat) / 2,
-    longitude: (minLng + maxLng) / 2,
-    latitudeDelta: Math.max(0.01, (maxLat - minLat) * 1.4),
-    longitudeDelta: Math.max(0.01, (maxLng - minLng) * 1.4),
-  };
-  const coords = route.map(p => ({ latitude: p.latitude ?? p.lat, longitude: p.longitude ?? p.lng }));
-
+  // Native: use the separately imported component so web never bundles react-native-maps
   return (
     <View style={modalStyles.routeSlide}>
-      <MapView style={modalStyles.nativeMap} region={region} scrollEnabled={false} zoomEnabled={false}>
-        <Polyline coordinates={coords} strokeColor="#29412c" strokeWidth={4} />
-        <Marker coordinate={coords[0]} pinColor="green" />
-        <Marker coordinate={coords[coords.length - 1]} pinColor="red" />
-      </MapView>
-      <Text style={modalStyles.routeTitle}>Your Route</Text>
+      <RouteMapNative route={route} />
     </View>
   );
 }
@@ -93,21 +78,17 @@ export default function PhotoGallery({ onOpenSettings, user }) {
   const loadPhotos = async (uid) => {
     setLoadingPhotos(true);
     try {
-      // Load storage items
       const userPhotosRef = ref(storage, `photos/${uid}/`);
       const result = await listAll(userPhotosRef);
       const photos = await Promise.all(
         result.items.map(async (item) => {
           const url = await getDownloadURL(item);
           const filename = item.name;
-
-          // Try to load matching Firestore metadata for route
           let route = null;
           try {
             const metaDoc = await getDoc(doc(db, 'photos', filename));
             if (metaDoc.exists()) route = metaDoc.data().route ?? null;
           } catch (e) {}
-
           return { uri: url, ref: item.fullPath, filename, route };
         })
       );
@@ -361,7 +342,6 @@ const modalStyles = StyleSheet.create({
   routeSlide: { width: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center', gap: 16 },
   routeTitle: { color: 'white', fontSize: 20, fontFamily: 'LilitaOne_400Regular' },
   staticMap: { width: SCREEN_WIDTH - 64, height: (SCREEN_WIDTH - 64) * 1.5, borderRadius: 12 },
-  nativeMap: { width: SCREEN_WIDTH - 64, height: (SCREEN_WIDTH - 64) * 1.5, borderRadius: 12 },
   noRoute: { alignItems: 'center', paddingTop: 40 },
   noRouteText: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
   swipeHint: { position: 'absolute', bottom: 45, width: '100%', alignItems: 'center' },
