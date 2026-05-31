@@ -18,6 +18,11 @@ const effectiveWidth = isWeb ? Math.min(width, MAX_WEB_WIDTH) : width;
 const POST_WIDTH = effectiveWidth - 32;
 const GRID_SIZE = (width - 4) / 3;
 
+function getTodayString() {
+  const now = new Date();
+  return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+}
+
 export default function HomeFeed() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +37,7 @@ export default function HomeFeed() {
 
   const [inboxOpen, setInboxOpen] = useState(false);
   const [inboxRequests, setInboxRequests] = useState([]);
+  const [pinRequests, setPinRequests] = useState([]);
 
   const [profilePage, setProfilePage] = useState(null);
   const [profilePhotos, setProfilePhotos] = useState([]);
@@ -41,6 +47,7 @@ export default function HomeFeed() {
 
   const unsubInboxRef = useRef(null);
   const unsubSentRef = useRef(null);
+  const unsubPinRef = useRef(null);
 
   useEffect(() => {
     const unsubAuth = auth.onAuthStateChanged((user) => {
@@ -48,12 +55,14 @@ export default function HomeFeed() {
         loadFriendsAndUsers(user.uid);
         unsubInboxRef.current = subscribeToInbox(user.uid);
         unsubSentRef.current = subscribeToSentRequests(user.uid);
+        unsubPinRef.current = subscribeToPinRequests(user.uid);
       }
     });
     return () => {
       unsubAuth();
       unsubInboxRef.current?.();
       unsubSentRef.current?.();
+      unsubPinRef.current?.();
     };
   }, []);
 
@@ -83,6 +92,18 @@ export default function HomeFeed() {
     });
   };
 
+  const subscribeToPinRequests = (uid) => {
+    const q = query(
+      collection(db, 'pinRequests'),
+      where('toUid', '==', uid),
+      where('status', '==', 'pending'),
+      where('date', '==', getTodayString())
+    );
+    return onSnapshot(q, (snapshot) => {
+      setPinRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  };
+
   const loadFriendsAndUsers = async (uid) => {
     try {
       const usersSnapshot = await getDocs(collection(db, 'users'));
@@ -107,7 +128,6 @@ export default function HomeFeed() {
       await Promise.all(
         allUsers.map(async (user) => {
           try {
-            // Fetch pfpUrl from Firestore user doc
             let pfpUrl = user.pfpUrl ?? null;
             if (!pfpUrl) {
               try {
@@ -133,7 +153,7 @@ export default function HomeFeed() {
               })
             );
             allPosts.push(...urls);
-          } catch (e) { /* no photos yet */ }
+          } catch (e) {}
         })
       );
 
@@ -244,6 +264,22 @@ export default function HomeFeed() {
     }
   };
 
+  const acceptPinRequest = async (request) => {
+    try {
+      await updateDoc(doc(db, 'pinRequests', request.id), { status: 'accepted' });
+    } catch (e) {
+      console.error('Failed to accept pin request:', e);
+    }
+  };
+
+  const declinePinRequest = async (request) => {
+    try {
+      await deleteDoc(doc(db, 'pinRequests', request.id));
+    } catch (e) {
+      console.error('Failed to decline pin request:', e);
+    }
+  };
+
   const removeFriend = async (targetUid) => {
     const currentUid = auth.currentUser?.uid;
     if (!currentUid) return;
@@ -290,6 +326,8 @@ export default function HomeFeed() {
     );
   };
 
+  const totalInbox = inboxRequests.length + pinRequests.length;
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -331,9 +369,9 @@ export default function HomeFeed() {
               style={styles.headerIconImg}
               resizeMode="contain"
             />
-            {inboxRequests.length > 0 && (
+            {totalInbox > 0 && (
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{inboxRequests.length}</Text>
+                <Text style={styles.badgeText}>{totalInbox}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -382,7 +420,7 @@ export default function HomeFeed() {
         </ScrollView>
       )}
 
-      {/* ── Search Modal ── */}
+      {/* Search Modal */}
       <Modal
         visible={searchOpen}
         animationType="slide"
@@ -453,7 +491,7 @@ export default function HomeFeed() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Inbox Modal ── */}
+      {/* Inbox Modal */}
       <Modal
         visible={inboxOpen}
         animationType="slide"
@@ -463,47 +501,88 @@ export default function HomeFeed() {
         <View style={styles.modalOverlayNoBg}>
           <View style={styles.modalSheetFullScreen}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Friend Requests</Text>
+              <Text style={styles.modalTitle}>Inbox</Text>
               <TouchableOpacity onPress={() => setInboxOpen(false)}>
                 <Image source={require('./waddl/Prettier/X-Out.png')} style={styles.closeIcon} resizeMode="contain" />
               </TouchableOpacity>
             </View>
 
-            {inboxRequests.length === 0 ? (
+            {totalInbox === 0 ? (
               <View style={styles.searchPrompt}>
                 <Image source={require('./waddl/Prettier/No_mail.png')} style={styles.emptyInboxImage} resizeMode="contain" />
                 <Text style={styles.searchPromptText}>No pending requests</Text>
               </View>
             ) : (
               <ScrollView style={styles.resultsList}>
-                {inboxRequests.map((request) => (
-                  <View key={request.id} style={styles.resultRow}>
-                    <View style={styles.resultPic}>
-                      <Text style={styles.resultInitial}>
-                        {(request.fromUsername || '?')[0].toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.resultInfo}>
-                      <Text style={styles.resultUsername}>@{request.fromUsername}</Text>
-                      <Text style={styles.resultBio}>wants to be your friend</Text>
-                    </View>
-                    <View style={styles.inboxActions}>
-                      <TouchableOpacity style={styles.acceptBtn} onPress={() => acceptRequest(request)}>
-                        <Text style={styles.acceptBtnText}>✓</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.declineBtn} onPress={() => declineRequest(request)}>
-                        <Text style={styles.declineBtnText}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
+
+                {/* Pin Requests */}
+                {pinRequests.length > 0 && (
+                  <>
+                    <Text style={styles.inboxSectionLabel}>📍 Pin Requests</Text>
+                    {pinRequests.map((request) => (
+                      <View key={request.id} style={styles.resultRow}>
+                        <View style={styles.resultPic}>
+                          <Text style={styles.resultInitial}>
+                            {(request.fromUsername || '?')[0].toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.resultInfo}>
+                          <Text style={styles.resultUsername}>@{request.fromUsername}</Text>
+                          <Text style={styles.resultBio}>wants to share their pin today 📍</Text>
+                        </View>
+                        <View style={styles.inboxActions}>
+                          <TouchableOpacity
+                            style={styles.acceptBtn}
+                            onPress={() => acceptPinRequest(request)}
+                          >
+                            <Text style={styles.acceptBtnText}>✓</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.declineBtn}
+                            onPress={() => declinePinRequest(request)}
+                          >
+                            <Text style={styles.declineBtnText}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {/* Friend Requests */}
+                {inboxRequests.length > 0 && (
+                  <>
+                    <Text style={styles.inboxSectionLabel}>👥 Friend Requests</Text>
+                    {inboxRequests.map((request) => (
+                      <View key={request.id} style={styles.resultRow}>
+                        <View style={styles.resultPic}>
+                          <Text style={styles.resultInitial}>
+                            {(request.fromUsername || '?')[0].toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.resultInfo}>
+                          <Text style={styles.resultUsername}>@{request.fromUsername}</Text>
+                          <Text style={styles.resultBio}>wants to be your friend</Text>
+                        </View>
+                        <View style={styles.inboxActions}>
+                          <TouchableOpacity style={styles.acceptBtn} onPress={() => acceptRequest(request)}>
+                            <Text style={styles.acceptBtnText}>✓</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.declineBtn} onPress={() => declineRequest(request)}>
+                            <Text style={styles.declineBtnText}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                )}
               </ScrollView>
             )}
           </View>
         </View>
       </Modal>
 
-      {/* ── Full Profile Page Modal ── */}
+      {/* Full Profile Page Modal */}
       <Modal
         visible={!!profilePage}
         animationType="slide"
@@ -567,7 +646,7 @@ export default function HomeFeed() {
         </View>
       </Modal>
 
-      {/* ── Feed post tap modal ── */}
+      {/* Feed post tap modal */}
       <Modal
         visible={!!profileModal}
         animationType="slide"
@@ -642,9 +721,9 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 11, fontFamily: 'LilitaOne_400Regular' },
 
   feed: { flex: 1 },
-  feedContent: { 
-    paddingHorizontal: 16, 
-    paddingTop: 16, 
+  feedContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 24,
     ...(Platform.OS === 'web' && {
       maxWidth: MAX_WEB_WIDTH,
@@ -723,6 +802,11 @@ const styles = StyleSheet.create({
   addBtnTextAdded: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
   addBtnTextPending: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#999' },
 
+  inboxSectionLabel: {
+    fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#29412c',
+    paddingVertical: 10, paddingHorizontal: 4,
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  },
   inboxActions: { flexDirection: 'row', gap: 8 },
   acceptBtn: {
     width: 38, height: 38, borderRadius: 19,
@@ -741,14 +825,9 @@ const styles = StyleSheet.create({
   profilePageContainer: { flex: 1, backgroundColor: '#e4e1d3' },
   profilePageHeader: {
     backgroundColor: '#29412c',
-    paddingTop: 54,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingTop: 54, paddingBottom: 14, paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderBottomLeftRadius: 20, borderBottomRightRadius: 20,
   },
   backBtn: { width: 60 },
   backArrow: { width: 40, height: 40 },
@@ -788,4 +867,4 @@ const styles = StyleSheet.create({
   profileModalInitial: { fontSize: 36, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
   viewProfileBtn: { marginTop: 14 },
   viewProfileBtnText: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
-});
+}); 
