@@ -151,7 +151,7 @@ export default function CameraScreen() {
 
         <View style={styles.logoContainer}>
           <Image
-            source={require('./waddl/Pretty/Top_logo.png')}
+            source={require('./waddl/Prettier/New_name.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -181,7 +181,7 @@ export default function CameraScreen() {
 
       <View style={styles.logoContainer}>
         <Image
-          source={require('./waddl/Pretty/Top_logo.png')}
+          source={require('./waddl/Prettier/New_name.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  logo: { height: 100, width: 300 },
+  logo: { height: 90, width: 240 },
   uploadedBadge: {
     color: '#a8e6a3',
     fontSize: 13,

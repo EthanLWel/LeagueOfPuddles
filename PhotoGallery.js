@@ -162,7 +162,7 @@ export default function PhotoGallery({ onOpenSettings, user }) {
       {/* Header */}
       <View style={galleryStyles.header}>
         <Image
-          source={require('./waddl/Pretty/Top_logo.png')}
+          source={require('./waddl/Prettier/New_name.png')}
           style={galleryStyles.logo}
           resizeMode="contain"
         />
@@ -375,8 +375,8 @@ const galleryStyles = StyleSheet.create({
     paddingHorizontal: 20, alignItems: 'center',
     borderBottomLeftRadius: 20, borderBottomRightRadius: 20,
   },
-  logo: { height: 100, width: 300 },
-  menuButton: { position: 'absolute', right: 20, top: 35, gap: 5 },
+  logo: { height: 90, width: 240 },
+  menuButton: { position: 'absolute', right: 35, top: 60, gap: 5 },
   menuLine: { width: 30, height: 4, backgroundColor: '#e4e1d3', borderRadius: 2 },
   profileSection: {
     alignItems: 'center', paddingVertical: 30,
