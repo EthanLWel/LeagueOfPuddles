@@ -735,7 +735,7 @@ const styles = StyleSheet.create({
   post: { marginBottom: 20, backgroundColor: '#d6d3c4', borderRadius: 16, overflow: 'hidden' },
   postHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
   profilePic: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 36, height: 36, borderRadius: 8,
     backgroundColor: '#29412c',
     justifyContent: 'center', alignItems: 'center', marginRight: 10,
     overflow: 'hidden',
@@ -842,7 +842,7 @@ const styles = StyleSheet.create({
   profilePageContent: { paddingBottom: 40 },
   profilePageTop: { alignItems: 'center', paddingTop: 30, paddingBottom: 24, paddingHorizontal: 24 },
   profilePageAvatar: {
-    width: 90, height: 90, borderRadius: 45,
+    width: 90, height: 90, borderRadius: 18,
     backgroundColor: '#29412c',
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 12, overflow: 'hidden',
@@ -863,7 +863,7 @@ const styles = StyleSheet.create({
 
   profileModalBody: { alignItems: 'center', paddingVertical: 20 },
   profileModalAvatar: {
-    width: 80, height: 80, borderRadius: 40,
+    width: 80, height: 80, borderRadius: 16,
     backgroundColor: '#29412c',
     justifyContent: 'center', alignItems: 'center',
     overflow: 'hidden',

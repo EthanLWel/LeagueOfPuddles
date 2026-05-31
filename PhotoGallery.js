@@ -243,7 +243,11 @@ export default function PhotoGallery({ onOpenSettings, user }) {
             <Image source={{ uri: item.uri }} style={styles.image} />
             {item.route && (
               <View style={styles.routeBadge}>
-                <Text style={styles.routeBadgeText}>🗺</Text>
+                <Image
+                  source={require('./waddl/Pretty/Pin.png')}
+                  style={styles.routeBadgeIcon}
+                  resizeMode="contain"
+                />
               </View>
             )}
           </TouchableOpacity>
@@ -380,6 +384,7 @@ const modalStyles = StyleSheet.create({
   slide: {
     width: SCREEN_WIDTH, height: SCREEN_HEIGHT,
     justifyContent: 'center', alignItems: 'center',
+    paddingBottom: 60,
   },
   fullImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.75 },
   deleteButton: {
@@ -390,7 +395,7 @@ const modalStyles = StyleSheet.create({
   deleteIcon: { width: 200, height: 200 },
   photoActions: { flexDirection: 'row', gap: 20, marginTop: 20 },
   actionButtonText: { fontSize: 24 },
-  swipeHint: { position: 'absolute', bottom: 45, width: '100%', alignItems: 'center' },
+  swipeHint: { position: 'absolute', bottom: 30, width: '100%', alignItems: 'center' },
   swipeHintText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontFamily: 'LilitaOne_400Regular' },
 });
 
@@ -400,9 +405,10 @@ const styles = StyleSheet.create({
   image: { width: '100%', height: '100%', borderRadius: 4 },
   routeBadge: {
     position: 'absolute', top: 4, right: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, padding: 2,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, padding: 4,
+    width: 24, height: 24, justifyContent: 'center', alignItems: 'center',
   },
-  routeBadgeText: { fontSize: 12 },
+  routeBadgeIcon: { width: 16, height: 16 },
   empty: { justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
   emptyIcon: { fontSize: 80 },
   emptyText: { color: '#333', fontSize: 20, fontFamily: 'LilitaOne_400Regular' },
