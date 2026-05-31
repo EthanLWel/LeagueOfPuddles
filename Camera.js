@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Image, Linking, StyleSheet, PanResponder } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { savePhoto } from './photoStorage';
+import { View, Text, TouchableOpacity, Image, Linking, StyleSheet, PanResponder, Platform } from 'react-native';
 
 export default function CameraScreen() {
   const [facing, setFacing] = useState('back');
@@ -146,35 +146,39 @@ export default function CameraScreen() {
       <View style={StyleSheet.absoluteFill} {...pinchResponder.panHandlers} pointerEvents="box-only" />
 
       {/* Zoom indicator */}
-      <View style={styles.zoomIndicator}>
-        <Text style={styles.zoomLabel}>{zoomLabel}</Text>
-        <View style={styles.zoomBarTrack}>
-          <View style={[styles.zoomBarFill, { width: `${zoom * 100}%` }]} />
+      {Platform.OS !== 'web' && (
+        <View style={styles.zoomIndicator}>
+          <Text style={styles.zoomLabel}>{zoomLabel}</Text>
+          <View style={styles.zoomBarTrack}>
+            <View style={[styles.zoomBarFill, { width: `${zoom * 100}%` }]} />
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Zoom buttons */}
-      <View style={styles.zoomContainer}>
-        {[0, 0.1, 0.2].map((level) => {
-          const isFront = facing === 'front';
-          const isUltrawide = level === 0;
-          const disabled = isFront && isUltrawide;
-          const frontZoom = level === 0 ? null : level === 0.1 ? 0 : 0.1;
-          const actualZoom = isFront ? frontZoom : level;
-          const label = level === 0 ? '0.5×' : level === 0.1 ? '1×' : '2×';
-          return (
-            <TouchableOpacity
-              key={level}
-              onPress={() => !disabled && setZoom(actualZoom)}
-              style={[styles.zoomBtn, zoom === actualZoom && styles.zoomBtnActive, disabled && styles.zoomBtnDisabled]}
-            >
-              <Text style={[styles.zoomText, zoom === actualZoom && styles.zoomTextActive, disabled && styles.zoomTextDisabled]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {Platform.OS !== 'web' && (
+        <View style={styles.zoomContainer}>
+          {[0, 0.1, 0.2].map((level) => {
+            const isFront = facing === 'front';
+            const isUltrawide = level === 0;
+            const disabled = isFront && isUltrawide;
+            const frontZoom = level === 0 ? null : level === 0.1 ? 0 : 0.1;
+            const actualZoom = isFront ? frontZoom : level;
+            const label = level === 0 ? '0.5×' : level === 0.1 ? '1×' : '2×';
+            return (
+              <TouchableOpacity
+                key={level}
+                onPress={() => !disabled && setZoom(actualZoom)}
+                style={[styles.zoomBtn, zoom === actualZoom && styles.zoomBtnActive, disabled && styles.zoomBtnDisabled]}
+              >
+                <Text style={[styles.zoomText, zoom === actualZoom && styles.zoomTextActive, disabled && styles.zoomTextDisabled]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {/* Camera Controls */}
       <View style={styles.controls}>
