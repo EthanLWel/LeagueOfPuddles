@@ -240,7 +240,11 @@ export default function CameraScreen() {
             });
           }}
         >
-          <Text style={styles.flipIcon}>🔄</Text>
+          <Image
+            source={require('./waddl/Prettier/Flip.png')}
+            style={styles.flipIcon}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={takePicture} style={[styles.captureButton, !cameraReady && { opacity: 0.4 }]} disabled={!cameraReady}>
@@ -330,7 +334,7 @@ const styles = StyleSheet.create({
   zoomTextActive: { color: 'white' },
   controls: { position: 'absolute', bottom: 40, width: '100%', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 30 },
   flipButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  flipIcon: { fontSize: 24 },
+  flipIcon: { width: 35, height: 35 },
   captureButton: { width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
   captureButtonImage: { width: 80, height: 80 },
   thumbnail: { width: 50, height: 50, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'white' },
