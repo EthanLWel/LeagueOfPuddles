@@ -67,12 +67,12 @@ export default function CameraScreen() {
   if (!permission.granted) {
     return (
       <View style={{ flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 12 }}>Camera access needed</Text>
+        <Text style={{ fontSize: 18, fontFamily: 'LilitaOne_400Regular', marginBottom: 12 }}>Camera access needed</Text>
         <TouchableOpacity onPress={requestPermission} style={{ backgroundColor: '#4A90E2', padding: 10, borderRadius: 8, marginBottom: 8 }}>
-          <Text style={{ color: 'white' }}>Grant Camera Permission</Text>
+          <Text style={{ color: 'white', fontFamily: 'LilitaOne_400Regular' }}>Grant Camera Permission</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => Linking.openURL('https://docs.expo.dev/versions/latest/sdk/camera/')}>
-          <Text style={{ color: '#4A90E2' }}>expo-camera docs</Text>
+          <Text style={{ color: '#4A90E2', fontFamily: 'LilitaOne_400Regular' }}>expo-camera docs</Text>
         </TouchableOpacity>
       </View>
     );
@@ -83,6 +83,15 @@ export default function CameraScreen() {
   return (
     <View style={{ flex: 1 }}>
       <CameraView style={{ flex: 1 }} facing={facing} ref={cameraRef} ratio="16:9" zoom={zoom} />
+
+      {/* Waddl Logo */}
+      <View style={styles.logoContainer}>
+        <Image 
+          source={require('./waddl/Pretty/Top_logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
 
       {/* Pinch overlay */}
       <View style={StyleSheet.absoluteFill} {...pinchResponder.panHandlers} pointerEvents="box-only" />
@@ -119,33 +128,61 @@ export default function CameraScreen() {
         })}
       </View>
 
-      <View style={{ position: 'absolute', bottom: 40, width: '100%', alignItems: 'center' }}>
-        <TouchableOpacity onPress={() => {
-          setFacing(f => {
-            const next = f === 'back' ? 'front' : 'back';
-            if (next === 'front') setZoom(0);
-            else setZoom(0.1);
-            return next;
-          });
-        }}>
-          <Text style={{ color: 'white', fontSize: 18, marginBottom: 8 }}>Flip</Text>
+      {/* Camera Controls */}
+      <View style={styles.controls}>
+        <TouchableOpacity 
+          style={styles.flipButton}
+          onPress={() => {
+            setFacing(f => {
+              const next = f === 'back' ? 'front' : 'back';
+              if (next === 'front') setZoom(0);
+              else setZoom(0.1);
+              return next;
+            });
+          }}
+        >
+          <Text style={styles.flipIcon}>🔄</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={takePicture} style={{ backgroundColor: 'white', padding: 12, borderRadius: 40 }}>
-          <Text>Take Photo</Text>
-        </TouchableOpacity>
-      </View>
 
-      {photoUri && (
-        <Image source={{ uri: photoUri }} style={{ width: 100, height: 100, position: 'absolute', right: 10, top: 10 }} />
-      )}
+        <TouchableOpacity onPress={takePicture} style={styles.captureButton}>
+          <Image 
+            source={require('./waddl/Pretty/Camera_button.png')}
+            style={styles.captureButtonImage}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+
+        {photoUri && (
+          <TouchableOpacity style={styles.thumbnail}>
+            <Image source={{ uri: photoUri }} style={styles.thumbnailImage} />
+          </TouchableOpacity>
+        )}
+        {!photoUri && <View style={styles.thumbnailPlaceholder} />}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  logoContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#29412c',
+    paddingTop: 30,
+    paddingBottom: 10,
+    alignItems: 'center',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  logo: {
+    height: 100,
+    width: 300,
+  },
   zoomIndicator: {
     position: 'absolute',
-    top: 16,
+    top: 160,
     alignSelf: 'center',
     alignItems: 'center',
     gap: 4,
@@ -153,7 +190,7 @@ const styles = StyleSheet.create({
   zoomLabel: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'LilitaOne_400Regular',
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
@@ -167,12 +204,12 @@ const styles = StyleSheet.create({
   },
   zoomBarFill: {
     height: '100%',
-    backgroundColor: 'white',
+    backgroundColor: '#e4e1d3',
     borderRadius: 2,
   },
   zoomContainer: {
     position: 'absolute',
-    bottom: 110,
+    bottom: 120,
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'center',
@@ -199,9 +236,55 @@ const styles = StyleSheet.create({
   zoomText: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'LilitaOne_400Regular',
   },
   zoomTextActive: {
     color: 'white',
+  },
+  controls: {
+    position: 'absolute',
+    bottom: 40,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+  },
+  flipButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  flipIcon: {
+    fontSize: 24,
+  },
+  captureButton: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureButtonImage: {
+    width: 80,
+    height: 80,
+  },
+  thumbnail: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailPlaceholder: {
+    width: 50,
+    height: 50,
   },
 });

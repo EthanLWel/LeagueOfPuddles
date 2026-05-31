@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, Image } from 'react-native';
 
 export default function Settings({ onBack }) {
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
@@ -11,7 +11,12 @@ export default function Settings({ onBack }) {
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Settings</Text>
+        <Image 
+          source={require('./waddl/Pretty/Top_logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <View style={styles.placeholder} />
       </View>
 
       <View style={styles.section}>
@@ -19,12 +24,30 @@ export default function Settings({ onBack }) {
 
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Notifications</Text>
-          <Switch value={notificationsEnabled} onValueChange={setNotificationsEnabled} />
+          <Switch 
+            value={notificationsEnabled} 
+            onValueChange={setNotificationsEnabled}
+            trackColor={{ false: '#ccc', true: '#29412c' }}
+            thumbColor={notificationsEnabled ? '#e4e1d3' : '#f4f3f4'}
+          />
         </View>
 
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Dark Mode</Text>
-          <Switch value={darkMode} onValueChange={setDarkMode} />
+          <Switch 
+            value={darkMode} 
+            onValueChange={setDarkMode}
+            trackColor={{ false: '#ccc', true: '#29412c' }}
+            thumbColor={darkMode ? '#e4e1d3' : '#f4f3f4'}
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>About</Text>
+        <View style={styles.aboutRow}>
+          <Text style={styles.aboutLabel}>Version</Text>
+          <Text style={styles.aboutValue}>1.0.0</Text>
         </View>
       </View>
     </View>
@@ -34,30 +57,36 @@ export default function Settings({ onBack }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#e4e1d3',
   },
   header: {
-    backgroundColor: '#4A90E2',
-    paddingTop: 50,
-    paddingBottom: 20,
+    backgroundColor: '#29412c',
+    paddingTop: 30,
+    paddingBottom: 10,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   backBtn: {
-    marginRight: 16,
+    width: 60,
   },
   backText: {
     color: 'white',
     fontSize: 16,
+    fontFamily: 'LilitaOne_400Regular',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: 'white',
+  logo: {
+    height: 100,
+    width: 300,
+  },
+  placeholder: {
+    width: 60,
   },
   section: {
-    backgroundColor: 'white',
+    backgroundColor: '#e4e1d3',
     marginTop: 24,
     marginHorizontal: 16,
     borderRadius: 12,
@@ -70,8 +99,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#888',
+    fontFamily: 'LilitaOne_400Regular',
+    color: '#29412c',
     marginBottom: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -82,10 +111,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#d0cdb8',
   },
   rowLabel: {
     fontSize: 16,
+    fontFamily: 'LilitaOne_400Regular',
     color: '#333',
+  },
+  aboutRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  aboutLabel: {
+    fontSize: 16,
+    fontFamily: 'LilitaOne_400Regular',
+    color: '#333',
+  },
+  aboutValue: {
+    fontSize: 16,
+    fontFamily: 'LilitaOne_400Regular',
+    color: '#666',
   },
 });

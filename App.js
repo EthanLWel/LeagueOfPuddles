@@ -1,37 +1,48 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
-<<<<<<< Updated upstream
-import CameraScreen from './Camera';
-import PhotoGallery from './PhotoGallery';
-import Settings from './Settings';
-=======
+import { StyleSheet, View, Image, TouchableOpacity, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
+import { useFonts, LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
+import HomeFeed from './HomeFeed';
 import CameraScreen from './Camera';
+import MapScreen from './MapScreen';
 import PhotoGallery from './PhotoGallery';
 import Settings from './Settings';
-import Mapscreen from './Mapscreen';
 
 const TODAY_KEY = 'last_opened_date';
+const PHOTOS_DIR = FileSystem.documentDirectory + 'photos/';
 
 function getTodayString() {
   const now = new Date();
   return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 }
->>>>>>> Stashed changes
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [showSettings, setShowSettings] = useState(false);
-<<<<<<< Updated upstream
-=======
   const [dailyResetKey, setDailyResetKey] = useState(null);
+
+  const [fontsLoaded] = useFonts({
+    LilitaOne_400Regular,
+  });
 
   useEffect(() => {
     (async () => {
       const today = getTodayString();
       const lastOpened = await AsyncStorage.getItem(TODAY_KEY);
+      
       if (lastOpened !== today) {
+        // New day - clear all photos
+        try {
+          const dirInfo = await FileSystem.getInfoAsync(PHOTOS_DIR);
+          if (dirInfo.exists) {
+            await FileSystem.deleteAsync(PHOTOS_DIR, { idempotent: true });
+          }
+        } catch (e) {
+          console.log('Error clearing photos:', e);
+        }
+        
         await AsyncStorage.setItem(TODAY_KEY, today);
         setDailyResetKey(today);
       } else {
@@ -39,108 +50,93 @@ export default function App() {
       }
     })();
   }, []);
->>>>>>> Stashed changes
 
-  const navigateTo = (screen) => setCurrentScreen(screen);
-  const navigateHome = () => setCurrentScreen('home');
+  const navigateTo = (screen) => {
+    setCurrentScreen(screen);
+    setShowSettings(false);
+  };
 
-<<<<<<< Updated upstream
+  if (!dailyResetKey || !fontsLoaded) return null;
+
   return (
     <View style={styles.container}>
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
       
-=======
-  if (!dailyResetKey) return null;
+      {currentScreen === 'home' && <HomeFeed />}
+      
+      {currentScreen === 'camera' && <CameraScreen />}
+      
+      {currentScreen === 'maps' && <MapScreen />}
+      
+      {currentScreen === 'gallery' && (
+        showSettings ? (
+          <Settings onBack={() => setShowSettings(false)} />
+        ) : (
+          <PhotoGallery onOpenSettings={() => setShowSettings(true)} />
+        )
+      )}
 
-  return (
-    <View style={styles.container}>
-      <StatusBar style="auto" />
+      {/* Bottom Navigation Bar */}
+      <View style={[
+        styles.bottomNav,
+        currentScreen === 'camera' && styles.bottomNavFlat
+      ]}>
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => navigateTo('home')}
+        >
+          <Image 
+            source={currentScreen === 'home' 
+              ? require('./waddl/Pretty/Home_Highlighted.png')
+              : require('./waddl/Pretty/Home_unhighlighted.png')
+            }
+            style={styles.navIcon}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
 
->>>>>>> Stashed changes
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>League of Puddles</Text>
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => navigateTo('camera')}
+        >
+          <Image 
+            source={currentScreen === 'camera'
+              ? require('./waddl/Pretty/Camera_highlighted.png')
+              : require('./waddl/Pretty/Camera_Unhighted.png')
+            }
+            style={styles.navIcon}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => navigateTo('maps')}
+        >
+          <Image 
+            source={currentScreen === 'maps'
+              ? require('./waddl/Pretty/Map_highlighted.png')
+              : require('./waddl/Pretty/Maps_unhighlighted.png')
+            }
+            style={styles.navIcon}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => navigateTo('gallery')}
+        >
+          <Image 
+            source={currentScreen === 'gallery'
+              ? require('./waddl/Pretty/Profile_highlighted.png')
+              : require('./waddl/Pretty/Account_unhighlighted.png')
+            }
+            style={styles.navIcon}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
       </View>
-
-      {currentScreen === 'home' && (
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-          <Text style={styles.sectionTitle}>Welcome! 🎉</Text>
-
-          <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('maps')}>
-            <Text style={styles.featureTitle}>Maps</Text>
-            <Text style={styles.featureDescription}>Display interactive maps with markers and routes</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('camera')}>
-            <Text style={styles.featureTitle}>Camera</Text>
-            <Text style={styles.featureDescription}>Take photos and videos</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.featureCard} onPress={() => navigateTo('gallery')}>
-            <Text style={styles.featureTitle}>Profile</Text>
-            <Text style={styles.featureDescription}>View, download, or delete your saved photos</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
-
-      {currentScreen === 'maps' && (
-<<<<<<< Updated upstream
-        <View style={styles.screenContainer}>
-          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-            <Text style={styles.sectionTitle}>Maps Section</Text>
-            <Text style={styles.screenText}>Maps functionality coming soon...</Text>
-          </ScrollView>
-=======
-        <Mapscreen key={dailyResetKey} onBack={navigateHome} />
-      )}
-
-      {currentScreen === 'camera' && (
-        <View style={styles.screenContainer}>
-          <CameraScreen />
->>>>>>> Stashed changes
-          <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
-            <Text style={styles.backButtonText}>← Back Home</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-<<<<<<< Updated upstream
-      {currentScreen === 'camera' && (
-        <View style={styles.screenContainer}>
-          <CameraScreen />
-          <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
-            <Text style={styles.backButtonText}>← Back Home</Text>
-          </TouchableOpacity>
-=======
-      {currentScreen === 'gallery' && (
-        <View style={styles.screenContainer}>
-          {showSettings ? (
-            <Settings onBack={() => setShowSettings(false)} />
-          ) : (
-            <>
-              <PhotoGallery onOpenSettings={() => setShowSettings(true)} />
-              <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
-                <Text style={styles.backButtonText}>← Back Home</Text>
-              </TouchableOpacity>
-            </>
-          )}
->>>>>>> Stashed changes
-        </View>
-      )}
-
-      {currentScreen === 'gallery' && (
-        <View style={styles.screenContainer}>
-          {showSettings ? (
-            <Settings onBack={() => setShowSettings(false)} />
-          ) : (
-            <>
-              <PhotoGallery onOpenSettings={() => setShowSettings(true)} />
-              <TouchableOpacity style={styles.backButton} onPress={navigateHome}>
-                <Text style={styles.backButtonText}>← Back Home</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      )}
     </View>
   );
 }
@@ -148,78 +144,31 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#e4e1d3',
   },
-  header: {
-    backgroundColor: '#4A90E2',
-    paddingTop: 50,
-    paddingBottom: 20,
+  bottomNav: {
+    flexDirection: 'row',
+    backgroundColor: '#29412c',
+    paddingBottom: 10,
+    paddingTop: 5,
     paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: 'space-around',
+    borderTopWidth: 1,
+    borderTopColor: '#1a2a1b',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
+  bottomNavFlat: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
   },
-  content: {
-    flex: 1,
-  },
-  screenContainer: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-  },
-  featureCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  featureTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
-  },
-  featureDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  screenText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 20,
-  },
-  backButton: {
-    backgroundColor: '#4A90E2',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    margin: 20,
-    borderRadius: 8,
+  navButton: {
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
   },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  navIcon: {
+    width: 55,
+    height: 55,
   },
 });
