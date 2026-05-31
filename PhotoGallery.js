@@ -5,7 +5,7 @@ import {
   ActivityIndicator, ScrollView, Platform
 } from 'react-native';
 import { ref, deleteObject, listAll, getDownloadURL } from 'firebase/storage';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { auth, storage, db } from './firebase';
 import RouteMap from './RouteMap';
 
@@ -20,6 +20,10 @@ export default function PhotoGallery({ onOpenSettings, user }) {
   const [pfpUri, setPfpUri] = useState(null);
   const [loadingPhotos, setLoadingPhotos] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [friends, setFriends] = useState([]);
+  const [friendProfile, setFriendProfile] = useState(null);
+  const [friendPhotos, setFriendPhotos] = useState([]);
+  const [friendPhotosLoading, setFriendPhotosLoading] = useState(false);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -27,6 +31,7 @@ export default function PhotoGallery({ onOpenSettings, user }) {
       if (firebaseUser) {
         loadPhotos(firebaseUser.uid);
         loadProfile(firebaseUser.uid);
+        loadFriends(firebaseUser.uid);
       } else {
         setLoadingPhotos(false);
       }
@@ -68,6 +73,40 @@ export default function PhotoGallery({ onOpenSettings, user }) {
       }
     } catch (e) {
       console.error('Failed to load profile:', e);
+    }
+  };
+
+  const loadFriends = async (uid) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      if (!userDoc.exists()) return;
+      const friendUids = userDoc.data().friends || [];
+      if (friendUids.length === 0) return;
+      const friendDocs = await Promise.all(
+        friendUids.map(fuid => getDoc(doc(db, 'users', fuid)))
+      );
+      const friendList = friendDocs
+        .filter(d => d.exists())
+        .map(d => ({ uid: d.id, ...d.data() }));
+      setFriends(friendList);
+    } catch (e) {
+      console.error('Failed to load friends:', e);
+    }
+  };
+
+  const openFriendProfile = async (friend) => {
+    setFriendProfile(friend);
+    setFriendPhotos([]);
+    setFriendPhotosLoading(true);
+    try {
+      const userPhotosRef = ref(storage, `photos/${friend.uid}/`);
+      const result = await listAll(userPhotosRef);
+      const urls = await Promise.all(result.items.map(item => getDownloadURL(item)));
+      setFriendPhotos(urls.reverse());
+    } catch (e) {
+      setFriendPhotos([]);
+    } finally {
+      setFriendPhotosLoading(false);
     }
   };
 
@@ -120,67 +159,101 @@ export default function PhotoGallery({ onOpenSettings, user }) {
         </TouchableOpacity>
       </View>
 
-      {/* Profile Section */}
-      <View style={galleryStyles.profileSection}>
-        <View style={galleryStyles.profilePic}>
-          {pfpUri ? (
-            <Image source={{ uri: pfpUri }} style={galleryStyles.profileImage} resizeMode="cover" />
+      <FlatList
+        data={photos}
+        keyExtractor={item => item.ref}
+        numColumns={3}
+        contentContainerStyle={styles.grid}
+        ListHeaderComponent={
+          <>
+            {/* Profile Section */}
+            <View style={galleryStyles.profileSection}>
+              <View style={galleryStyles.profilePic}>
+                {pfpUri ? (
+                  <Image source={{ uri: pfpUri }} style={galleryStyles.profileImage} resizeMode="cover" />
+                ) : (
+                  <Image
+                    source={require('./waddl/Pretty/waddl.png')}
+                    style={galleryStyles.profileImage}
+                    resizeMode="cover"
+                  />
+                )}
+              </View>
+              <Text style={galleryStyles.username}>@{user?.username ?? 'Unknown'}</Text>
+              <Text style={galleryStyles.bio}>{bio}</Text>
+            </View>
+
+            {/* Friends List */}
+            {friends.length > 0 && (
+              <View style={friendStyles.section}>
+                <Text style={friendStyles.sectionTitle}>Friends</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={friendStyles.row}>
+                  {friends.map(friend => (
+                    <TouchableOpacity
+                      key={friend.uid}
+                      style={friendStyles.friendItem}
+                      onPress={() => openFriendProfile(friend)}
+                    >
+                      <View style={friendStyles.avatar}>
+                        {friend.pfpUrl ? (
+                          <Image source={{ uri: friend.pfpUrl }} style={friendStyles.avatarImage} resizeMode="cover" />
+                        ) : (
+                          <Text style={friendStyles.avatarInitial}>
+                            {(friend.username || '?')[0].toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={friendStyles.friendName} numberOfLines={1}>
+                        @{friend.username}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {uploading && (
+              <View style={styles.uploadingBanner}>
+                <ActivityIndicator size="small" color="#29412c" />
+                <Text style={styles.uploadingText}>Uploading photo...</Text>
+              </View>
+            )}
+
+            {photos.length > 0 && (
+              <Text style={styles.photosHeader}>My Photos</Text>
+            )}
+          </>
+        }
+        ListEmptyComponent={
+          loadingPhotos ? (
+            <View style={styles.empty}>
+              <ActivityIndicator size="large" color="#29412c" />
+              <Text style={styles.emptyText}>Loading photos...</Text>
+            </View>
           ) : (
-            <Image
-              source={require('./waddl/Pretty/waddl.png')}
-              style={galleryStyles.profileImage}
-              resizeMode="cover"
-            />
-          )}
-        </View>
-        <Text style={galleryStyles.username}>@{user?.username ?? 'Unknown'}</Text>
-        <Text style={galleryStyles.bio}>{bio}</Text>
-      </View>
-
-      {/* Upload indicator */}
-      {uploading && (
-        <View style={styles.uploadingBanner}>
-          <ActivityIndicator size="small" color="#29412c" />
-          <Text style={styles.uploadingText}>Uploading photo...</Text>
-        </View>
-      )}
-
-      {/* Photos Grid */}
-      {loadingPhotos ? (
-        <View style={styles.empty}>
-          <ActivityIndicator size="large" color="#29412c" />
-          <Text style={styles.emptyText}>Loading photos...</Text>
-        </View>
-      ) : photos.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>📸</Text>
-          <Text style={styles.emptyText}>No photos yet</Text>
-          <Text style={styles.emptySubtext}>Take your first puddle photo!</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={photos}
-          keyExtractor={item => item.ref}
-          numColumns={3}
-          contentContainerStyle={styles.grid}
-          renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => openPhoto(item)} style={styles.thumb}>
-              <Image source={{ uri: item.uri }} style={styles.image} />
-              {item.route && (
-                <View style={styles.routeBadge}>
-                  <Text style={styles.routeBadgeText}>🗺</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
-        />
-      )}
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>📸</Text>
+              <Text style={styles.emptyText}>No photos yet</Text>
+              <Text style={styles.emptySubtext}>Take your first puddle photo!</Text>
+            </View>
+          )
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity onPress={() => openPhoto(item)} style={styles.thumb}>
+            <Image source={{ uri: item.uri }} style={styles.image} />
+            {item.route && (
+              <View style={styles.routeBadge}>
+                <Text style={styles.routeBadgeText}>🗺</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+      />
 
       {/* Full Photo Modal */}
       {selectedPhoto && (
         <Modal visible={!!selectedPhoto} transparent onRequestClose={() => setSelectedPhoto(null)}>
           <View style={modalStyles.overlay}>
-
             <TouchableOpacity style={modalStyles.closeButton} onPress={() => setSelectedPhoto(null)}>
               <Text style={modalStyles.closeButtonText}>✕</Text>
             </TouchableOpacity>
@@ -201,7 +274,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
               scrollEnabled={hasRoute}
               style={{ flex: 1 }}
             >
-              {/* Slide 1: Photo */}
               <View style={modalStyles.slide}>
                 <Image
                   source={{ uri: selectedPhoto.uri }}
@@ -220,7 +292,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
                 </TouchableOpacity>
               </View>
 
-              {/* Slide 2: Route */}
               {hasRoute && (
                 <View style={modalStyles.slide}>
                   <RouteMap route={selectedPhoto.route} />
@@ -233,6 +304,58 @@ export default function PhotoGallery({ onOpenSettings, user }) {
                 <Text style={modalStyles.swipeHintText}>Swipe for route →</Text>
               </View>
             )}
+          </View>
+        </Modal>
+      )}
+
+      {/* Friend Profile Modal */}
+      {friendProfile && (
+        <Modal visible={!!friendProfile} animationType="slide" onRequestClose={() => setFriendProfile(null)}>
+          <View style={friendProfileStyles.container}>
+            <View style={friendProfileStyles.header}>
+              <TouchableOpacity onPress={() => setFriendProfile(null)} style={friendProfileStyles.backBtn}>
+                <Image source={require('./waddl/Prettier/Arrow.png')} style={friendProfileStyles.backArrow} resizeMode="contain" />
+              </TouchableOpacity>
+              <Image source={require('./waddl/Prettier/New_name.png')} style={friendProfileStyles.headerTitle} resizeMode="contain" />
+              <View style={{ width: 60 }} />
+            </View>
+
+            <ScrollView contentContainerStyle={friendProfileStyles.content}>
+              <View style={friendProfileStyles.top}>
+                <View style={friendProfileStyles.avatar}>
+                  {friendProfile.pfpUrl ? (
+                    <Image source={{ uri: friendProfile.pfpUrl }} style={friendProfileStyles.avatarImage} resizeMode="cover" />
+                  ) : (
+                    <Text style={friendProfileStyles.avatarInitial}>
+                      {(friendProfile.username || '?')[0].toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                <Text style={friendProfileStyles.username}>@{friendProfile.username}</Text>
+                {friendProfile.bio ? (
+                  <Text style={friendProfileStyles.bio}>{friendProfile.bio}</Text>
+                ) : null}
+              </View>
+
+              <View style={friendProfileStyles.divider} />
+
+              {friendPhotosLoading ? (
+                <View style={friendProfileStyles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#29412c" />
+                </View>
+              ) : friendPhotos.length === 0 ? (
+                <View style={friendProfileStyles.emptyContainer}>
+                  <Text style={friendProfileStyles.emptyIcon}>🌧️</Text>
+                  <Text style={friendProfileStyles.emptyText}>No puddles yet</Text>
+                </View>
+              ) : (
+                <View style={friendProfileStyles.photoGrid}>
+                  {friendPhotos.map((url, i) => (
+                    <Image key={i} source={{ uri: url }} style={friendProfileStyles.gridPhoto} />
+                  ))}
+                </View>
+              )}
+            </ScrollView>
           </View>
         </Modal>
       )}
@@ -280,7 +403,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, padding: 2,
   },
   routeBadgeText: { fontSize: 12 },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
+  empty: { justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
   emptyIcon: { fontSize: 80 },
   emptyText: { color: '#333', fontSize: 20, fontFamily: 'LilitaOne_400Regular' },
   emptySubtext: { color: '#999', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
@@ -290,6 +413,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#b0d4b4',
   },
   uploadingText: { fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
+  photosHeader: {
+    fontSize: 16, fontFamily: 'LilitaOne_400Regular', color: '#29412c',
+    paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6,
+  },
 });
 
 const galleryStyles = StyleSheet.create({
@@ -313,4 +440,61 @@ const galleryStyles = StyleSheet.create({
   profileImage: { width: '100%', height: '100%' },
   username: { fontSize: 20, fontFamily: 'LilitaOne_400Regular', color: '#29412c', marginBottom: 8 },
   bio: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#29412c', textAlign: 'center', paddingHorizontal: 40 },
+});
+
+const friendStyles = StyleSheet.create({
+  section: {
+    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#d0cdb8',
+    backgroundColor: '#e4e1d3',
+  },
+  sectionTitle: {
+    fontSize: 16, fontFamily: 'LilitaOne_400Regular', color: '#29412c',
+    paddingHorizontal: 16, marginBottom: 12,
+  },
+  row: { paddingHorizontal: 12, gap: 16 },
+  friendItem: { alignItems: 'center', width: 70 },
+  avatar: {
+    width: 56, height: 56, borderRadius: 12,
+    backgroundColor: '#29412c',
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 6, overflow: 'hidden',
+    borderWidth: 2, borderColor: '#29412c',
+  },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarInitial: { fontSize: 24, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
+  friendName: { fontSize: 11, fontFamily: 'LilitaOne_400Regular', color: '#29412c', textAlign: 'center' },
+});
+
+const friendProfileStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#e4e1d3' },
+  header: {
+    backgroundColor: '#29412c', paddingTop: 54, paddingBottom: 14,
+    paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', borderBottomLeftRadius: 20, borderBottomRightRadius: 20,
+  },
+  backBtn: { width: 60, justifyContent: 'center', alignItems: 'flex-start' },
+  backArrow: { width: 40, height: 40 },
+  headerTitle: { height: 50, width: 160 },
+  content: { paddingBottom: 40 },
+  top: { alignItems: 'center', paddingTop: 30, paddingBottom: 24, paddingHorizontal: 24 },
+  avatar: {
+    width: 100, height: 100, borderRadius: 20,
+    backgroundColor: '#29412c', justifyContent: 'center',
+    alignItems: 'center', marginBottom: 12, overflow: 'hidden',
+  },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarInitial: { fontSize: 44, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
+  username: { fontSize: 22, fontFamily: 'LilitaOne_400Regular', color: '#29412c', marginBottom: 6 },
+  bio: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#666', textAlign: 'center', lineHeight: 20 },
+  divider: { height: 1, backgroundColor: '#d0cdb8', marginHorizontal: 16, marginBottom: 2 },
+  loadingContainer: { paddingTop: 40, alignItems: 'center' },
+  emptyContainer: { paddingTop: 40, alignItems: 'center', gap: 10 },
+  emptyIcon: { fontSize: 48 },
+  emptyText: { fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#999' },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  gridPhoto: {
+    width: Math.floor((Dimensions.get('window').width - 12) / 3),
+    height: Math.floor((Dimensions.get('window').width - 12) / 3),
+    margin: 2,
+  },
 });

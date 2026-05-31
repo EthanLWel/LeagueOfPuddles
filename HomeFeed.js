@@ -12,7 +12,10 @@ import { ref, listAll, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from './firebase';
 
 const { width } = Dimensions.get('window');
-const POST_WIDTH = width - 32;
+const isWeb = Platform.OS === 'web';
+const MAX_WEB_WIDTH = 600;
+const effectiveWidth = isWeb ? Math.min(width, MAX_WEB_WIDTH) : width;
+const POST_WIDTH = effectiveWidth - 32;
 const GRID_SIZE = (width - 4) / 3;
 
 export default function HomeFeed() {
@@ -639,7 +642,17 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 11, fontFamily: 'LilitaOne_400Regular' },
 
   feed: { flex: 1 },
-  feedContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 },
+  feedContent: { 
+    paddingHorizontal: 16, 
+    paddingTop: 16, 
+    paddingBottom: 24,
+    ...(Platform.OS === 'web' && {
+      maxWidth: MAX_WEB_WIDTH,
+      marginHorizontal: 'auto',
+      alignSelf: 'center',
+      width: '100%',
+    }),
+  },
   post: { marginBottom: 20, backgroundColor: '#d6d3c4', borderRadius: 16, overflow: 'hidden' },
   postHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
   profilePic: {
