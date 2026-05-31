@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "417755298888",
+    "project_id": "uoo-quackathon26eug-8241",
+    "storage_bucket": "uoo-quackathon26eug-8241.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:417755298888:android:35812dde9ee2cba44dec7d",
+        "android_client_info": {
+          "package_name": "com.leagueofpuddles"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCyixP9HfXmD42yaB2FfsyWTXaTV4BtraQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
