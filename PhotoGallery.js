@@ -208,14 +208,16 @@ export default function PhotoGallery({ onOpenSettings, user }) {
                   style={modalStyles.fullImage}
                   resizeMode="contain"
                 />
-                <View style={modalStyles.photoActions}>
-                  <TouchableOpacity
-                    style={modalStyles.deleteButton}
-                    onPress={() => handleDelete(selectedPhoto)}
-                  >
-                    <Text style={modalStyles.actionButtonText}>🗑</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity 
+                  style={modalStyles.deleteButton}
+                  onPress={() => handleDelete(selectedPhoto)}
+                >
+                  <Image
+                    source={require('./waddl/Prettier/Delete_button.png')}
+                    style={modalStyles.deleteIcon}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
               </View>
 
               {/* Slide 2: Route */}
@@ -257,11 +259,13 @@ const modalStyles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   fullImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.75 },
-  photoActions: { flexDirection: 'row', gap: 20, marginTop: 20 },
   deleteButton: {
-    width: 55, height: 55, borderRadius: 27.5,
-    backgroundColor: 'rgba(200,0,0,0.85)', justifyContent: 'center', alignItems: 'center',
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
   },
+  deleteIcon: { width: 200, height: 200 },
+  photoActions: { flexDirection: 'row', gap: 20, marginTop: 20 },
   actionButtonText: { fontSize: 24 },
   swipeHint: { position: 'absolute', bottom: 45, width: '100%', alignItems: 'center' },
   swipeHintText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontFamily: 'LilitaOne_400Regular' },

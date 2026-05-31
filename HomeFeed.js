@@ -509,9 +509,17 @@ export default function HomeFeed() {
         <View style={styles.profilePageContainer}>
           <View style={styles.profilePageHeader}>
             <TouchableOpacity onPress={closeProfilePage} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={styles.backBtnText}>← Back</Text>
+              <Image
+                source={require('./waddl/Prettier/Arrow.png')}
+                style={styles.backArrow}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
-            <Text style={styles.profilePageTitle}>@{profilePage?.username}</Text>
+            <Image
+              source={require('./waddl/Prettier/New_name.png')}
+              style={styles.profilePageLogo}
+              resizeMode="contain"
+            />
             <View style={{ width: 60 }} />
           </View>
 
@@ -730,7 +738,9 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 20,
   },
   backBtn: { width: 60 },
+  backArrow: { width: 40, height: 40 },
   backBtnText: { fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
+  profilePageLogo: { height: 50, width: 160 },
   profilePageTitle: { fontSize: 18, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
   profilePageContent: { paddingBottom: 40 },
   profilePageTop: { alignItems: 'center', paddingTop: 30, paddingBottom: 24, paddingHorizontal: 24 },
