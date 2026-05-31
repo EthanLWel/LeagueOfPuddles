@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, Image, TouchableOpacity, StyleSheet,
   Dimensions, ActivityIndicator, RefreshControl, Modal, TextInput,
-  KeyboardAvoidingView, Platform
+  KeyboardAvoidingView, Platform, FlatList
 } from 'react-native';
 import {
   collection, getDocs, doc, getDoc, updateDoc, arrayUnion, arrayRemove,
@@ -13,6 +13,7 @@ import { auth, db, storage } from './firebase';
 
 const { width } = Dimensions.get('window');
 const POST_WIDTH = width - 32;
+const GRID_SIZE = (width - 4) / 3;
 
 export default function HomeFeed() {
   const [posts, setPosts] = useState([]);
@@ -29,7 +30,13 @@ export default function HomeFeed() {
   const [inboxOpen, setInboxOpen] = useState(false);
   const [inboxRequests, setInboxRequests] = useState([]);
 
-  const [profileModal, setProfileModal] = useState(null); // { uid, username }
+  // Profile page state
+  const [profilePage, setProfilePage] = useState(null); // { uid, username, bio }
+  const [profilePhotos, setProfilePhotos] = useState([]);
+  const [profilePhotosLoading, setProfilePhotosLoading] = useState(false);
+
+  // Post tap modal (from feed)
+  const [profileModal, setProfileModal] = useState(null);
 
   const unsubInboxRef = useRef(null);
   const unsubSentRef = useRef(null);
@@ -75,7 +82,6 @@ export default function HomeFeed() {
     });
   };
 
-  // uid passed explicitly — never relies on auth.currentUser being set
   const loadFriendsAndUsers = async (uid) => {
     try {
       const usersSnapshot = await getDocs(collection(db, 'users'));
@@ -135,13 +141,40 @@ export default function HomeFeed() {
     }
   };
 
+  const loadProfilePhotos = async (uid) => {
+    setProfilePhotosLoading(true);
+    try {
+      const userPhotosRef = ref(storage, `photos/${uid}/`);
+      const result = await listAll(userPhotosRef);
+      const urls = await Promise.all(result.items.map(item => getDownloadURL(item)));
+      setProfilePhotos(urls);
+    } catch (e) {
+      setProfilePhotos([]);
+    } finally {
+      setProfilePhotosLoading(false);
+    }
+  };
+
+  const openProfilePage = (user) => {
+    setProfilePage(user);
+    setProfilePhotos([]);
+    loadProfilePhotos(user.uid);
+    // close search
+    setSearchOpen(false);
+    setSearchQuery('');
+  };
+
+  const closeProfilePage = () => {
+    setProfilePage(null);
+    setProfilePhotos([]);
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     const uid = auth.currentUser?.uid;
     if (uid) loadFriendsAndUsers(uid);
   };
 
-  // Derived synchronously — no useEffect race
   const searchResults = searchQuery.trim()
     ? allUsersForSearch.filter(u =>
         (u.username || '').toLowerCase().includes(searchQuery.toLowerCase().trim())
@@ -219,6 +252,34 @@ export default function HomeFeed() {
     return 'none';
   };
 
+  const FriendButton = ({ uid, onAction }) => {
+    const state = getButtonState(uid);
+    if (state === 'friends') return (
+      <TouchableOpacity
+        style={[styles.addBtn, styles.addBtnAdded]}
+        onPress={() => { removeFriend(uid); onAction?.(); }}
+      >
+        <Text style={styles.addBtnTextAdded}>Friends ✓</Text>
+      </TouchableOpacity>
+    );
+    if (state === 'pending') return (
+      <TouchableOpacity
+        style={[styles.addBtn, styles.addBtnPending]}
+        onPress={() => { cancelRequest(uid); onAction?.(); }}
+      >
+        <Text style={styles.addBtnTextPending}>Pending…</Text>
+      </TouchableOpacity>
+    );
+    return (
+      <TouchableOpacity
+        style={styles.addBtn}
+        onPress={() => { sendFriendRequest(uid); onAction?.(); }}
+      >
+        <Text style={styles.addBtnText}>+ Add Friend</Text>
+      </TouchableOpacity>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -249,9 +310,7 @@ export default function HomeFeed() {
           >
             <Text style={styles.headerIcon}>🔍</Text>
           </TouchableOpacity>
-
           <Image source={require('./waddl/Pretty/Top_logo.png')} style={styles.logo} resizeMode="contain" />
-
           <TouchableOpacity
             style={styles.headerSideBtn}
             onPress={() => setInboxOpen(true)}
@@ -305,7 +364,7 @@ export default function HomeFeed() {
         </ScrollView>
       )}
 
-      {/* Search Modal */}
+      {/* ── Search Modal ── */}
       <Modal
         visible={searchOpen}
         animationType="slide"
@@ -345,53 +404,34 @@ export default function HomeFeed() {
               </View>
             ) : (
               <ScrollView style={styles.resultsList} keyboardShouldPersistTaps="handled">
-                {searchResults.map((user) => {
-                  const state = getButtonState(user.uid);
-                  return (
-                    <View key={user.uid} style={styles.resultRow}>
-                      <View style={styles.resultPic}>
-                        <Text style={styles.resultInitial}>
-                          {(user.username || '?')[0].toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={styles.resultInfo}>
-                        <Text style={styles.resultUsername}>@{user.username}</Text>
-                        <Text style={styles.resultBio} numberOfLines={1}>
-                          {user.bio || 'No bio yet'}
-                        </Text>
-                      </View>
-                      {state === 'friends' ? (
-                        <TouchableOpacity
-                          style={[styles.addBtn, styles.addBtnAdded]}
-                          onPress={() => removeFriend(user.uid)}
-                        >
-                          <Text style={styles.addBtnTextAdded}>Friends ✓</Text>
-                        </TouchableOpacity>
-                      ) : state === 'pending' ? (
-                        <TouchableOpacity
-                          style={[styles.addBtn, styles.addBtnPending]}
-                          onPress={() => cancelRequest(user.uid)}
-                        >
-                          <Text style={styles.addBtnTextPending}>Pending…</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.addBtn}
-                          onPress={() => sendFriendRequest(user.uid)}
-                        >
-                          <Text style={styles.addBtnText}>+ Add</Text>
-                        </TouchableOpacity>
-                      )}
+                {searchResults.map((user) => (
+                  <TouchableOpacity
+                    key={user.uid}
+                    style={styles.resultRow}
+                    onPress={() => openProfilePage(user)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.resultPic}>
+                      <Text style={styles.resultInitial}>
+                        {(user.username || '?')[0].toUpperCase()}
+                      </Text>
                     </View>
-                  );
-                })}
+                    <View style={styles.resultInfo}>
+                      <Text style={styles.resultUsername}>@{user.username}</Text>
+                      <Text style={styles.resultBio} numberOfLines={1}>
+                        {user.bio || 'No bio yet'}
+                      </Text>
+                    </View>
+                    <Text style={styles.resultChevron}>›</Text>
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
             )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Inbox Modal */}
+      {/* ── Inbox Modal ── */}
       <Modal
         visible={inboxOpen}
         animationType="slide"
@@ -426,16 +466,10 @@ export default function HomeFeed() {
                       <Text style={styles.resultBio}>wants to be your friend</Text>
                     </View>
                     <View style={styles.inboxActions}>
-                      <TouchableOpacity
-                        style={styles.acceptBtn}
-                        onPress={() => acceptRequest(request)}
-                      >
+                      <TouchableOpacity style={styles.acceptBtn} onPress={() => acceptRequest(request)}>
                         <Text style={styles.acceptBtnText}>✓</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.declineBtn}
-                        onPress={() => declineRequest(request)}
-                      >
+                      <TouchableOpacity style={styles.declineBtn} onPress={() => declineRequest(request)}>
                         <Text style={styles.declineBtnText}>✕</Text>
                       </TouchableOpacity>
                     </View>
@@ -447,7 +481,62 @@ export default function HomeFeed() {
         </View>
       </Modal>
 
-      {/* Profile tap modal */}
+      {/* ── Full Profile Page Modal ── */}
+      <Modal
+        visible={!!profilePage}
+        animationType="slide"
+        onRequestClose={closeProfilePage}
+      >
+        <View style={styles.profilePageContainer}>
+          {/* Back header */}
+          <View style={styles.profilePageHeader}>
+            <TouchableOpacity onPress={closeProfilePage} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={styles.backBtnText}>← Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.profilePageTitle}>@{profilePage?.username}</Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          <ScrollView contentContainerStyle={styles.profilePageContent}>
+            {/* Avatar + info */}
+            <View style={styles.profilePageTop}>
+              <View style={styles.profilePageAvatar}>
+                <Text style={styles.profilePageInitial}>
+                  {(profilePage?.username || '?')[0].toUpperCase()}
+                </Text>
+              </View>
+              <Text style={styles.profilePageUsername}>@{profilePage?.username}</Text>
+              {profilePage?.bio ? (
+                <Text style={styles.profilePageBio}>{profilePage.bio}</Text>
+              ) : null}
+              <View style={{ marginTop: 14 }}>
+                {profilePage && <FriendButton uid={profilePage.uid} />}
+              </View>
+            </View>
+
+            {/* Photo grid */}
+            <View style={styles.profilePageDivider} />
+            {profilePhotosLoading ? (
+              <View style={styles.profilePhotosLoading}>
+                <ActivityIndicator size="large" color="#29412c" />
+              </View>
+            ) : profilePhotos.length === 0 ? (
+              <View style={styles.profilePhotosEmpty}>
+                <Text style={styles.profilePhotosEmptyIcon}>🌧️</Text>
+                <Text style={styles.profilePhotosEmptyText}>No puddles yet</Text>
+              </View>
+            ) : (
+              <View style={styles.photoGrid}>
+                {profilePhotos.map((url, i) => (
+                  <Image key={i} source={{ uri: url }} style={styles.gridPhoto} />
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ── Feed post tap modal ── */}
       <Modal
         visible={!!profileModal}
         animationType="slide"
@@ -462,41 +551,26 @@ export default function HomeFeed() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-
             <View style={styles.profileModalBody}>
               <View style={styles.profileModalAvatar}>
                 <Text style={styles.profileModalInitial}>
                   {(profileModal?.username || '?')[0].toUpperCase()}
                 </Text>
               </View>
-
-              {profileModal && (() => {
-                const state = getButtonState(profileModal.uid);
-                if (state === 'friends') return (
-                  <TouchableOpacity
-                    style={[styles.addBtn, styles.addBtnAdded, { alignSelf: 'center', marginTop: 16 }]}
-                    onPress={() => { removeFriend(profileModal.uid); setProfileModal(null); }}
-                  >
-                    <Text style={styles.addBtnTextAdded}>Friends ✓</Text>
-                  </TouchableOpacity>
-                );
-                if (state === 'pending') return (
-                  <TouchableOpacity
-                    style={[styles.addBtn, styles.addBtnPending, { alignSelf: 'center', marginTop: 16 }]}
-                    onPress={() => { cancelRequest(profileModal.uid); setProfileModal(null); }}
-                  >
-                    <Text style={styles.addBtnTextPending}>Pending…</Text>
-                  </TouchableOpacity>
-                );
-                return (
-                  <TouchableOpacity
-                    style={[styles.addBtn, { alignSelf: 'center', marginTop: 16 }]}
-                    onPress={() => { sendFriendRequest(profileModal.uid); setProfileModal(null); }}
-                  >
-                    <Text style={styles.addBtnText}>+ Add Friend</Text>
-                  </TouchableOpacity>
-                );
-              })()}
+              {profileModal && (
+                <View style={{ marginTop: 16 }}>
+                  <FriendButton uid={profileModal.uid} onAction={() => setProfileModal(null)} />
+                </View>
+              )}
+              <TouchableOpacity
+                style={styles.viewProfileBtn}
+                onPress={() => {
+                  const user = allUsersForSearch.find(u => u.uid === profileModal?.uid);
+                  if (user) { setProfileModal(null); openProfilePage(user); }
+                }}
+              >
+                <Text style={styles.viewProfileBtnText}>View full profile →</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
@@ -518,17 +592,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerSideBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerSideBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerIcon: { fontSize: 24 },
   logo: { height: 60, width: 180 },
 
@@ -536,8 +601,7 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 4, right: 4,
     backgroundColor: '#e63946',
     borderRadius: 10, minWidth: 18, height: 18,
-    justifyContent: 'center', alignItems: 'center',
-    paddingHorizontal: 3,
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3,
   },
   badgeText: { color: '#fff', fontSize: 11, fontFamily: 'LilitaOne_400Regular' },
 
@@ -580,6 +644,7 @@ const styles = StyleSheet.create({
   searchPrompt: { alignItems: 'center', paddingTop: 30, gap: 12 },
   searchPromptText: { fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#999' },
   emptyInboxIcon: { fontSize: 48 },
+  resultsList: { maxHeight: 400 },
   resultRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#d0cdb8' },
   resultPic: {
     width: 44, height: 44, borderRadius: 22,
@@ -590,12 +655,15 @@ const styles = StyleSheet.create({
   resultInfo: { flex: 1 },
   resultUsername: { fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
   resultBio: { fontSize: 12, fontFamily: 'LilitaOne_400Regular', color: '#999', marginTop: 2 },
-  addBtn: { backgroundColor: '#29412c', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
+  resultChevron: { fontSize: 22, color: '#29412c', fontFamily: 'LilitaOne_400Regular', paddingLeft: 8 },
+
+  addBtn: { backgroundColor: '#29412c', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 9 },
   addBtnAdded: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#29412c' },
   addBtnPending: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#999' },
-  addBtnText: { fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
-  addBtnTextAdded: { fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
-  addBtnTextPending: { fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#999' },
+  addBtnText: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
+  addBtnTextAdded: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
+  addBtnTextPending: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#999' },
+
   inboxActions: { flexDirection: 'row', gap: 8 },
   acceptBtn: {
     width: 38, height: 38, borderRadius: 19,
@@ -610,7 +678,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   declineBtnText: { color: '#e63946', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
-  resultsList: { maxHeight: 400 },
+
+  // ── Full profile page ────────────────────────────────────────────
+  profilePageContainer: { flex: 1, backgroundColor: '#e4e1d3' },
+  profilePageHeader: {
+    backgroundColor: '#29412c',
+    paddingTop: 54,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  backBtn: { width: 60 },
+  backBtnText: { fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
+  profilePageTitle: { fontSize: 18, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
+  profilePageContent: { paddingBottom: 40 },
+  profilePageTop: { alignItems: 'center', paddingTop: 30, paddingBottom: 24, paddingHorizontal: 24 },
+  profilePageAvatar: {
+    width: 90, height: 90, borderRadius: 45,
+    backgroundColor: '#29412c',
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 12,
+  },
+  profilePageInitial: { fontSize: 40, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
+  profilePageUsername: { fontSize: 22, fontFamily: 'LilitaOne_400Regular', color: '#29412c', marginBottom: 6 },
+  profilePageBio: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#666', textAlign: 'center', lineHeight: 20 },
+  profilePageDivider: { height: 1, backgroundColor: '#d0cdb8', marginHorizontal: 16, marginBottom: 2 },
+
+  profilePhotosLoading: { paddingTop: 40, alignItems: 'center' },
+  profilePhotosEmpty: { paddingTop: 40, alignItems: 'center', gap: 10 },
+  profilePhotosEmptyIcon: { fontSize: 48 },
+  profilePhotosEmptyText: { fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#999' },
+
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  gridPhoto: { width: Math.floor((width - 12) / 3), height: Math.floor((width - 12) / 3), margin: 2 },
+
+  // ── Feed post tap mini-modal ─────────────────────────────────────
   profileModalBody: { alignItems: 'center', paddingVertical: 20 },
   profileModalAvatar: {
     width: 80, height: 80, borderRadius: 40,
@@ -618,4 +724,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   profileModalInitial: { fontSize: 36, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
+  viewProfileBtn: { marginTop: 14 },
+  viewProfileBtnText: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
 });
