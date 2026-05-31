@@ -94,7 +94,7 @@ async function uriToDataURL(uri) {
 
 // ─── Web implementations ──────────────────────────────────────────
 
-async function webSavePhoto(tempUri) {
+async function webSavePhoto(tempUri, route = null) {
   const user = getCurrentUser();
   const filename = `photo_${Date.now()}.jpg`;
   const dataURL = await uriToDataURL(tempUri);
@@ -104,6 +104,7 @@ async function webSavePhoto(tempUri) {
     savedAt: Date.now(),
     username: user?.username || 'unknown',
     displayName: user?.displayName || 'Unknown',
+    route,  // array of {lat, lng} or null
   });
   return dataURL;
 }
@@ -164,7 +165,7 @@ async function nativeWriteMeta(meta) {
   await FileSystem.writeAsStringAsync(META_FILE, JSON.stringify(meta));
 }
 
-async function nativeSavePhoto(tempUri) {
+async function nativeSavePhoto(tempUri, route = null) {
   await nativeEnsurePhotoDir();
   const user = getCurrentUser();
   const filename = `photo_${Date.now()}.jpg`;
@@ -177,6 +178,7 @@ async function nativeSavePhoto(tempUri) {
     savedAt: Date.now(),
     username: user?.username || 'unknown',
     displayName: user?.displayName || 'Unknown',
+    route,
   });
   await nativeWriteMeta(meta);
   return destUri;
