@@ -232,7 +232,14 @@ export default function MapScreen() {
 
             {pinInfo && (
               <View style={styles.routeInfo}>
-                <Text style={styles.routeInfoText}>🗺 {pinInfo.distance} away</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Image
+                    source={require('./waddl/Pretty/Pin.png')}
+                    style={{ width: 16, height: 16 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.routeInfoText}>{pinInfo.distance} away</Text>
+                </View>
                 <Text style={styles.routeInfoText}>⏱ {pinInfo.duration}</Text>
               </View>
             )}
