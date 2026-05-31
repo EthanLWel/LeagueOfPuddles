@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, Image, ActivityIndicator, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const RADIUS_KEY = 'walk_radius';
@@ -74,73 +74,81 @@ export default function Settings({ onBack, onLogout, user }) {
         <View style={styles.placeholder} />
       </View>
 
-      <View style={styles.profileSection}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.username?.[0]?.toUpperCase() ?? '?'}
-          </Text>
-        </View>
-        <Text style={styles.username}>{user?.username ?? 'Unknown'}</Text>
-        <Text style={styles.userId}>ID: {user?.id ?? '-'}</Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Walk Settings</Text>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Walk Radius</Text>
-          <View style={styles.radiusRow}>
-            <TouchableOpacity
-              style={styles.radiusBtn}
-              onPress={() => updateRadius(radius - 0.5)}
-            >
-              <Text style={styles.radiusBtnText}>−</Text>
-            </TouchableOpacity>
-            <Text style={styles.radiusValue}>
-              {radius === 0 ? 'Here' : `${radius} mi`}
+        {/* Profile section */}
+        <View style={styles.profileSection}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {user?.username?.[0]?.toUpperCase() ?? '?'}
             </Text>
-            <TouchableOpacity
-              style={styles.radiusBtn}
-              onPress={() => updateRadius(radius + 0.5)}
-            >
-              <Text style={styles.radiusBtnText}>+</Text>
-            </TouchableOpacity>
+          </View>
+          <Text style={styles.username}>{user?.username ?? 'Unknown'}</Text>
+          <Text style={styles.userId}>ID: {user?.id ?? '-'}</Text>
+        </View>
+
+        {/* Walk Settings */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Walk Settings</Text>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Walk Radius</Text>
+            <View style={styles.radiusRow}>
+              <TouchableOpacity
+                style={styles.radiusBtn}
+                onPress={() => updateRadius(radius - 0.5)}
+              >
+                <Text style={styles.radiusBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.radiusValue}>
+                {radius === 0 ? 'Here' : `${radius} mi`}
+              </Text>
+              <TouchableOpacity
+                style={styles.radiusBtn}
+                onPress={() => updateRadius(radius + 0.5)}
+              >
+                <Text style={styles.radiusBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Notifications</Text>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={handleNotifications}
-            trackColor={{ false: '#ccc', true: '#29412c' }}
-            thumbColor={notificationsEnabled ? '#e4e1d3' : '#f4f3f4'}
-          />
+        {/* Preferences */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Notifications</Text>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={handleNotifications}
+              trackColor={{ false: '#ccc', true: '#29412c' }}
+              thumbColor={notificationsEnabled ? '#e4e1d3' : '#f4f3f4'}
+            />
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Dark Mode</Text>
+            <Switch
+              value={darkMode}
+              onValueChange={handleDarkMode}
+              trackColor={{ false: '#ccc', true: '#29412c' }}
+              thumbColor={darkMode ? '#e4e1d3' : '#f4f3f4'}
+            />
+          </View>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Dark Mode</Text>
-          <Switch
-            value={darkMode}
-            onValueChange={handleDarkMode}
-            trackColor={{ false: '#ccc', true: '#29412c' }}
-            thumbColor={darkMode ? '#e4e1d3' : '#f4f3f4'}
-          />
-        </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
-        <View style={styles.aboutRow}>
-          <Text style={styles.aboutLabel}>Version</Text>
-          <Text style={styles.aboutValue}>1.0.0</Text>
+        {/* About */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Version</Text>
+            <Text style={styles.aboutValue}>1.0.0</Text>
+          </View>
         </View>
-      </View>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+
+      </ScrollView>
     </View>
   );
 }
@@ -162,6 +170,7 @@ const styles = StyleSheet.create({
   backText: { color: 'white', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
   logo: { height: 100, width: 300 },
   placeholder: { width: 60 },
+  scrollContent: { paddingBottom: 40 },
   profileSection: {
     alignItems: 'center',
     marginTop: 24,
@@ -181,8 +190,8 @@ const styles = StyleSheet.create({
   username: { fontSize: 22, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
   userId: { fontSize: 12, fontFamily: 'LilitaOne_400Regular', color: '#999' },
   section: {
-    backgroundColor: '#e4e1d3',
-    marginTop: 24,
+    backgroundColor: '#fff',
+    marginTop: 16,
     marginHorizontal: 16,
     borderRadius: 12,
     padding: 16,

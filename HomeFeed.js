@@ -4,12 +4,10 @@ import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, Dimensions
 const { width } = Dimensions.get('window');
 
 export default function HomeFeed() {
-  // Static feed showing posts from other users/friends
   const friendPosts = [];
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Image 
           source={require('./waddl/Pretty/Top_logo.png')}
@@ -18,7 +16,6 @@ export default function HomeFeed() {
         />
       </View>
 
-      {/* Feed */}
       {friendPosts.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>👥</Text>
@@ -29,7 +26,6 @@ export default function HomeFeed() {
         <ScrollView style={styles.feed}>
           {friendPosts.map((post, index) => (
             <View key={index} style={styles.post}>
-              {/* Post Header */}
               <View style={styles.postHeader}>
                 <View style={styles.profileInfo}>
                   <View style={styles.profilePic}>
@@ -45,7 +41,6 @@ export default function HomeFeed() {
                 </TouchableOpacity>
               </View>
 
-              {/* Post Image */}
               <View style={styles.imageContainer}>
                 <Image 
                   source={{ uri: post.imageUri }}
@@ -54,7 +49,6 @@ export default function HomeFeed() {
                 />
               </View>
 
-              {/* Action Buttons */}
               <View style={styles.actions}>
                 <TouchableOpacity style={styles.actionButton}>
                   <Text style={styles.actionIcon}>❤️</Text>
@@ -67,7 +61,6 @@ export default function HomeFeed() {
                 </TouchableOpacity>
               </View>
 
-              {/* Post Info */}
               <View style={styles.postInfo}>
                 <Text style={styles.likes}>{post.likes} likes</Text>
                 <Text style={styles.caption}>
@@ -84,10 +77,7 @@ export default function HomeFeed() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#e4e1d3',
-  },
+  container: { flex: 1, backgroundColor: '#e4e1d3' },
   header: {
     backgroundColor: '#29412c',
     paddingTop: 30,
@@ -97,17 +87,9 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  logo: {
-    height: 100,
-    width: 300,
-  },
-  feed: {
-    flex: 1,
-  },
-  post: {
-    marginBottom: 20,
-    backgroundColor: '#e4e1d3',
-  },
+  logo: { height: 100, width: 300 },
+  feed: { flex: 1 },
+  post: { marginBottom: 20, backgroundColor: '#e4e1d3' },
   postHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -115,101 +97,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
-  profileInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  profileInfo: { flexDirection: 'row', alignItems: 'center' },
   profilePic: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 40, height: 40, borderRadius: 20,
     backgroundColor: '#e1e8ed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
+    justifyContent: 'center', alignItems: 'center', marginRight: 10,
   },
-  profileInitial: {
-    fontSize: 20,
-    fontFamily: 'LilitaOne_400Regular',
-  },
-  username: {
-    fontSize: 14,
-    fontFamily: 'LilitaOne_400Regular',
-    color: '#000',
-  },
-  location: {
-    fontSize: 12,
-    fontFamily: 'LilitaOne_400Regular',
-    color: '#666',
-  },
-  moreIcon: {
-    fontSize: 24,
-    color: '#000',
-  },
-  imageContainer: {
-    width: width,
-    height: width,
-    backgroundColor: '#f0f0f0',
-  },
-  postImage: {
-    width: '100%',
-    height: '100%',
-  },
+  profileInitial: { fontSize: 20, fontFamily: 'LilitaOne_400Regular' },
+  username: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#000' },
+  location: { fontSize: 12, fontFamily: 'LilitaOne_400Regular', color: '#666' },
+  moreIcon: { fontSize: 24, color: '#000' },
+  imageContainer: { width, height: width, backgroundColor: '#f0f0f0' },
+  postImage: { width: '100%', height: '100%' },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
+    flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40,
   },
-  emptyIcon: {
-    fontSize: 80,
-    marginBottom: 20,
-  },
+  emptyIcon: { fontSize: 80, marginBottom: 20 },
   emptyText: {
-    fontSize: 24,
-    fontFamily: 'LilitaOne_400Regular',
-    color: '#333',
-    marginBottom: 10,
+    fontSize: 24, fontFamily: 'LilitaOne_400Regular', color: '#333', marginBottom: 10,
   },
   emptySubtext: {
-    fontSize: 16,
-    fontFamily: 'LilitaOne_400Regular',
-    color: '#999',
-    textAlign: 'center',
+    fontSize: 16, fontFamily: 'LilitaOne_400Regular', color: '#999', textAlign: 'center',
   },
-  actions: {
-    flexDirection: 'row',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-  },
-  actionButton: {
-    marginRight: 15,
-  },
-  actionIcon: {
-    fontSize: 24,
-  },
-  postInfo: {
-    paddingHorizontal: 15,
-    paddingBottom: 10,
-  },
-  likes: {
-    fontSize: 14,
-    fontFamily: 'LilitaOne_400Regular',
-    color: '#000',
-    marginBottom: 5,
-  },
-  caption: {
-    fontSize: 14,
-    fontFamily: 'LilitaOne_400Regular',
-    color: '#000',
-    marginBottom: 5,
-  },
-  captionUsername: {
-    fontFamily: 'LilitaOne_400Regular',
-  },
-  timeAgo: {
-    fontSize: 12,
-    fontFamily: 'LilitaOne_400Regular',
-    color: '#999',
-  },
+  actions: { flexDirection: 'row', paddingHorizontal: 15, paddingVertical: 10 },
+  actionButton: { marginRight: 15 },
+  actionIcon: { fontSize: 24 },
+  postInfo: { paddingHorizontal: 15, paddingBottom: 10 },
+  likes: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#000', marginBottom: 5 },
+  caption: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#000', marginBottom: 5 },
+  captionUsername: { fontFamily: 'LilitaOne_400Regular' },
+  timeAgo: { fontSize: 12, fontFamily: 'LilitaOne_400Regular', color: '#999' },
 });
