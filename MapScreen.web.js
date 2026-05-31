@@ -417,7 +417,11 @@ export default function MapScreen() {
                   style={styles.shareBtn}
                   onPress={() => setShareModalOpen(true)}
                 >
-                  <Text style={styles.shareBtnText}>👥 Share</Text>
+                  <Image
+                    source={require('./waddl/Pretty/Sharre_button.png')}
+                    style={styles.shareBtnImage}
+                    resizeMode="contain"
+                  />
                 </TouchableOpacity>
               )}
             </View>
@@ -495,7 +499,11 @@ export default function MapScreen() {
                   {sharing ? (
                     <ActivityIndicator size="small" color="#29412c" />
                   ) : (
-                    <Text style={styles.friendSend}>Send →</Text>
+                    <Image
+                      source={require('./waddl/Pretty/Send_button.png')}
+                      style={styles.friendSendBtn}
+                      resizeMode="contain"
+                    />
                   )}
                 </TouchableOpacity>
               ))}
@@ -528,8 +536,8 @@ const styles = StyleSheet.create({
   dropBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   flipImage: { width: 24, height: 24 },
   dropBtnText: { color: '#e4e1d3', fontFamily: 'LilitaOne_400Regular', fontSize: 15 },
-  shareBtn: { backgroundColor: '#4a7c59', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  shareBtnText: { color: '#e4e1d3', fontFamily: 'LilitaOne_400Regular', fontSize: 14 },
+  shareBtn: { width: 100, height: 50, justifyContent: 'center', alignItems: 'center' },
+  shareBtnImage: { width: '100%', height: '100%' },
   routeInfo: { flexDirection: 'row', gap: 16 },
   routeInfoText: { fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#333' },
   searchError: { fontSize: 12, fontFamily: 'LilitaOne_400Regular', color: '#c00' },
@@ -547,5 +555,5 @@ const styles = StyleSheet.create({
   friendAvatarImage: { width: '100%', height: '100%' },
   friendAvatarText: { fontSize: 20, fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3' },
   friendName: { flex: 1, fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
-  friendSend: { fontSize: 15, fontFamily: 'LilitaOne_400Regular', color: '#4a7c59' },
+  friendSendBtn: { width: 80, height: 40 },
 });
