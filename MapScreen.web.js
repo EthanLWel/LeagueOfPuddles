@@ -70,13 +70,14 @@ export default function MapScreen() {
     }
   };
 
+  // Returns the shared destination pin if found, or null
   const checkAcceptedPinShare = async () => {
     try {
       const uid = auth.currentUser?.uid;
-      if (!uid) return false;
+      if (!uid) return null;
 
       const alreadyApplied = localStorage.getItem(SHARED_PIN_KEY);
-      if (alreadyApplied === getTodayString()) return false;
+      if (alreadyApplied === getTodayString()) return null;
 
       const q = query(
         collection(db, 'pinRequests'),
@@ -85,31 +86,27 @@ export default function MapScreen() {
         where('date', '==', getTodayString())
       );
       const snap = await getDocs(q);
-      if (snap.empty) return false;
+      if (snap.empty) return null;
 
       const data = snap.docs[0].data();
-      const pin = data.sharedPin;
-      const path = data.sharedPath ?? null;
-      const distance = data.sharedDistance ?? '? mi';
-      const duration = data.sharedDuration ?? '? min';
-
-      setPinInfo({ pin, distance, duration });
-      setDirections(path ? { path } : null);
       setSharedWith(data.fromUsername ?? 'a friend');
-
+      localStorage.setItem(SHARED_PIN_KEY, getTodayString());
+      // Save the destination pin now so loadSavedPin won't race us;
+      // path will be overwritten once we compute the recipient's own route.
       localStorage.setItem(PIN_KEY, JSON.stringify({
         date: getTodayString(),
-        pin,
-        distance,
-        duration,
-        path,
+        pin: data.sharedPin,
+        distance: data.sharedDistance ?? '? mi',
+        duration: data.sharedDuration ?? '? min',
+        path: null,
       }));
-      localStorage.setItem(SHARED_PIN_KEY, getTodayString());
       await deleteDoc(doc(db, 'pinRequests', snap.docs[0].id));
-      return true;
+
+      // Return the destination so we can re-route from the recipient's location
+      return data.sharedPin;
     } catch (e) {
       console.error('Error checking shared pin:', e);
-      return false;
+      return null;
     }
   };
 
@@ -170,6 +167,50 @@ export default function MapScreen() {
     } finally {
       setSharing(false);
     }
+  };
+
+  // Routes from the user's current location to a fixed destination (used for shared pins)
+  const dropPinToDestination = async (loc, destination) => {
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
+          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+        },
+        body: JSON.stringify({
+          origin: { location: { latLng: { latitude: loc.lat, longitude: loc.lng } } },
+          destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+          travelMode: 'WALK',
+          computeAlternativeRoutes: false,
+        }),
+      });
+      const data = await response.json();
+      if (!data.routes || data.routes.length === 0) throw new Error('No routes found');
+      const route = data.routes[0];
+      const actualMeters = route.distanceMeters;
+      const durationSecs = parseInt(route.duration.replace('s', ''), 10);
+      const durationText = `${Math.round(durationSecs / 60)} min`;
+      const distanceMiles = (actualMeters / 1609.34).toFixed(2);
+      const path = decodePolyline(route.polyline.encodedPolyline);
+
+      setDirections({ path });
+      setPinInfo({ pin: destination, distance: `${distanceMiles} mi`, duration: durationText });
+      localStorage.setItem(PIN_KEY, JSON.stringify({
+        date: getTodayString(),
+        pin: destination,
+        distance: `${distanceMiles} mi`,
+        duration: durationText,
+        path,
+      }));
+    } catch (e) {
+      console.error('Failed to route to shared destination:', e);
+      setSearchError('Could not route to shared destination.');
+    }
+    setSearching(false);
   };
 
   const dropPin = async (currentCenter) => {
@@ -276,47 +317,46 @@ export default function MapScreen() {
   useEffect(() => {
     (async () => {
       await loadFriends();
-      const sharedApplied = await checkAcceptedPinShare();
+      const sharedDestination = await checkAcceptedPinShare();
 
-      if (!sharedApplied) {
-        const hasSavedPin = loadSavedPin();
-        if (!navigator.geolocation) {
-          setLocationError('Geolocation not supported.');
-          setCenter(DEFAULT_CENTER);
-          setLoading(false);
-          if (!hasSavedPin) dropPin(DEFAULT_CENTER);
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            setCenter(coords);
-            setLoading(false);
-            if (!hasSavedPin) await dropPin(coords);
-          },
-          async () => {
-            setLocationError('Location denied. Showing default location.');
-            setCenter(DEFAULT_CENTER);
-            setLoading(false);
-            if (!hasSavedPin) await dropPin(DEFAULT_CENTER);
-          },
-          { timeout: 10000 }
-        );
-      } else {
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-              setLoading(false);
-            },
-            () => { setCenter(DEFAULT_CENTER); setLoading(false); },
-            { timeout: 10000 }
-          );
+      if (!navigator.geolocation) {
+        setLocationError('Geolocation not supported.');
+        setCenter(DEFAULT_CENTER);
+        setLoading(false);
+        if (sharedDestination) {
+          await dropPinToDestination(DEFAULT_CENTER, sharedDestination);
         } else {
+          const hasSavedPin = loadSavedPin();
+          if (!hasSavedPin) await dropPin(DEFAULT_CENTER);
+        }
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setCenter(coords);
+          setLoading(false);
+          if (sharedDestination) {
+            await dropPinToDestination(coords, sharedDestination);
+          } else {
+            const hasSavedPin = loadSavedPin();
+            if (!hasSavedPin) await dropPin(coords);
+          }
+        },
+        async () => {
+          setLocationError('Location denied. Showing default location.');
           setCenter(DEFAULT_CENTER);
           setLoading(false);
-        }
-      }
+          if (sharedDestination) {
+            await dropPinToDestination(DEFAULT_CENTER, sharedDestination);
+          } else {
+            const hasSavedPin = loadSavedPin();
+            if (!hasSavedPin) await dropPin(DEFAULT_CENTER);
+          }
+        },
+        { timeout: 10000 }
+      );
     })();
   }, []);
 
@@ -391,26 +431,30 @@ export default function MapScreen() {
 
             {searchError && <Text style={styles.searchError}>{searchError}</Text>}
           </View>
-
-          <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} libraries={LIBRARIES}>
-            <GoogleMap
-              mapContainerStyle={{ width: '100%', flex: 1 }}
-              center={center}
-              zoom={13}
-              onLoad={map => (mapRef.current = map)}
-            >
-              <Marker position={center} title="You are here" />
-              {pinInfo && <Marker position={pinInfo.pin} title="Your destination" label="!" />}
-              {directions && (
-                <Polyline
-                  path={directions.path}
-                  options={{ strokeColor: '#29412c', strokeWeight: 4, strokeOpacity: 0.8 }}
-                />
-              )}
-            </GoogleMap>
-          </LoadScript>
         </>
       )}
+
+      {/* LoadScript is always mounted so the Maps JS library loads immediately on startup,
+          ensuring Polyline is available the moment dropPinToDestination sets directions state */}
+      <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} libraries={LIBRARIES}>
+        {!loading && center && (
+          <GoogleMap
+            mapContainerStyle={{ width: '100%', flex: 1 }}
+            center={center}
+            zoom={13}
+            onLoad={map => (mapRef.current = map)}
+          >
+            <Marker position={center} title="You are here" />
+            {pinInfo && <Marker position={pinInfo.pin} title="Your destination" label="!" />}
+            {directions && (
+              <Polyline
+                path={directions.path}
+                options={{ strokeColor: '#29412c', strokeWeight: 4, strokeOpacity: 0.8 }}
+              />
+            )}
+          </GoogleMap>
+        )}
+      </LoadScript>
 
       {/* Share Pin Modal */}
       <Modal
