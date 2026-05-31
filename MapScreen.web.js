@@ -49,7 +49,7 @@ export default function MapScreen() {
   const [searchError, setSearchError] = useState(null);
   const [friends, setFriends] = useState([]);
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [sharing, setSharing] = useState(false);
+  const [sharingUid, setSharingUid] = useState(null); // tracks which friend row is spinning
   const [sharedWith, setSharedWith] = useState(null);
   const mapRef = useRef(null);
   const initializedRef = useRef(false);
@@ -127,7 +127,7 @@ export default function MapScreen() {
 
   const sendPinShare = async (friend) => {
     if (!pinInfo) return;
-    setSharing(true);
+    setSharingUid(friend.uid); // only this friend's row spins
     try {
       const uid = auth.currentUser?.uid;
       const userDoc = await getDoc(doc(db, 'users', uid));
@@ -153,7 +153,7 @@ export default function MapScreen() {
       console.error('Failed to share pin:', e);
       Alert.alert('Error', 'Could not send pin request. Try again.');
     } finally {
-      setSharing(false);
+      setSharingUid(null); // clear regardless of success/failure
     }
   };
 
@@ -203,7 +203,6 @@ export default function MapScreen() {
   };
 
   const dropPin = async (currentCenter) => {
-    // Don't overwrite a shared pin with a radius-based one
     if (isSharedPin.current) {
       Alert.alert(
         'Shared Pin Active',
@@ -497,7 +496,7 @@ export default function MapScreen() {
                   key={friend.uid}
                   style={styles.friendRow}
                   onPress={() => sendPinShare(friend)}
-                  disabled={sharing}
+                  disabled={sharingUid !== null}
                 >
                   <View style={styles.friendAvatar}>
                     {friend.pfpUrl ? (
@@ -509,7 +508,7 @@ export default function MapScreen() {
                     )}
                   </View>
                   <Text style={styles.friendName}>@{friend.username}</Text>
-                  {sharing ? (
+                  {sharingUid === friend.uid ? (
                     <ActivityIndicator size="small" color="#29412c" />
                   ) : (
                     <Image
