@@ -8,12 +8,14 @@ export default function CameraScreen() {
   const [facing, setFacing] = useState('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [mediaPermission] = MediaLibrary.usePermissions();
-  const [photoUri, setPhotoUri] = useState(null);
+  const [photoUri, setPhotoUri] = useState(null);        // last saved (thumbnail)
+  const [previewUri, setPreviewUri] = useState(null);    // pending confirmation
   const [zoom, setZoom] = useState(0.1);
   const cameraRef = useRef(null);
   const lastZoom = useRef(0);
   const lastDistance = useRef(null);
 
+  // --- pinch-to-zoom (unchanged) ---
   const getDistance = (touches) => {
     const [a, b] = touches;
     const dx = a.pageX - b.pageX;
@@ -26,17 +28,13 @@ export default function CameraScreen() {
       onStartShouldSetPanResponder: (e) => e.nativeEvent.touches.length === 2,
       onMoveShouldSetPanResponder: (e) => e.nativeEvent.touches.length === 2,
       onPanResponderGrant: (e) => {
-        if (e.nativeEvent.touches.length === 2) {
+        if (e.nativeEvent.touches.length === 2)
           lastDistance.current = getDistance(e.nativeEvent.touches);
-        }
       },
       onPanResponderMove: (e) => {
         if (e.nativeEvent.touches.length !== 2) return;
         const dist = getDistance(e.nativeEvent.touches);
-        if (lastDistance.current === null) {
-          lastDistance.current = dist;
-          return;
-        }
+        if (lastDistance.current === null) { lastDistance.current = dist; return; }
         const delta = (dist - lastDistance.current) / 400;
         lastDistance.current = dist;
         setZoom(prev => {
@@ -45,21 +43,35 @@ export default function CameraScreen() {
           return next;
         });
       },
-      onPanResponderRelease: () => {
-        lastDistance.current = null;
-      },
+      onPanResponderRelease: () => { lastDistance.current = null; },
     })
   ).current;
 
+  // --- capture: store preview, don't save yet ---
   const takePicture = async () => {
     if (!cameraRef.current) return;
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8, exif: false });
-      await savePhoto(photo.uri);
-      setPhotoUri(photo.uri);
+      setPreviewUri(photo.uri);   // show preview overlay
     } catch (e) {
       console.error('takePicture error', e);
     }
+  };
+
+  // --- user happy with the shot ---
+  const confirmPhoto = async () => {
+    try {
+      await savePhoto(previewUri);
+      setPhotoUri(previewUri);    // update thumbnail
+      setPreviewUri(null);        // dismiss preview
+    } catch (e) {
+      console.error('confirmPhoto error', e);
+    }
+  };
+
+  // --- user wants to try again ---
+  const retakePhoto = () => {
+    setPreviewUri(null);
   };
 
   if (!permission) return <View><Text>Requesting camera permission...</Text></View>;
@@ -67,9 +79,16 @@ export default function CameraScreen() {
   if (!permission.granted) {
     return (
       <View style={{ flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ fontSize: 18, fontFamily: 'LilitaOne_400Regular', marginBottom: 12 }}>Camera access needed</Text>
-        <TouchableOpacity onPress={requestPermission} style={{ backgroundColor: '#4A90E2', padding: 10, borderRadius: 8, marginBottom: 8 }}>
-          <Text style={{ color: 'white', fontFamily: 'LilitaOne_400Regular' }}>Grant Camera Permission</Text>
+        <Text style={{ fontSize: 18, fontFamily: 'LilitaOne_400Regular', marginBottom: 12 }}>
+          Camera access needed
+        </Text>
+        <TouchableOpacity
+          onPress={requestPermission}
+          style={{ backgroundColor: '#4A90E2', padding: 10, borderRadius: 8, marginBottom: 8 }}
+        >
+          <Text style={{ color: 'white', fontFamily: 'LilitaOne_400Regular' }}>
+            Grant Camera Permission
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => Linking.openURL('https://docs.expo.dev/versions/latest/sdk/camera/')}>
           <Text style={{ color: '#4A90E2', fontFamily: 'LilitaOne_400Regular' }}>expo-camera docs</Text>
@@ -80,13 +99,43 @@ export default function CameraScreen() {
 
   const zoomLabel = zoom < 0.0075 ? '0.5×' : zoom < 0.05 ? '1×' : '2×';
 
+  // ── PREVIEW SCREEN ──────────────────────────────────────────────
+  if (previewUri) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <Image source={{ uri: previewUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+
+        {/* Waddl logo */}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('./waddl/Pretty/Top_logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Action buttons */}
+        <View style={previewStyles.actions}>
+          <TouchableOpacity onPress={retakePhoto} style={previewStyles.retakeBtn}>
+            <Text style={previewStyles.retakeText}>Retake</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={confirmPhoto} style={previewStyles.useBtn}>
+            <Text style={previewStyles.useText}>Use Photo</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ── CAMERA SCREEN ───────────────────────────────────────────────
   return (
     <View style={{ flex: 1 }}>
       <CameraView style={{ flex: 1 }} facing={facing} ref={cameraRef} ratio="16:9" zoom={zoom} />
 
       {/* Waddl Logo */}
       <View style={styles.logoContainer}>
-        <Image 
+        <Image
           source={require('./waddl/Pretty/Top_logo.png')}
           style={styles.logo}
           resizeMode="contain"
@@ -113,7 +162,6 @@ export default function CameraScreen() {
           const frontZoom = level === 0 ? null : level === 0.1 ? 0 : 0.1;
           const actualZoom = isFront ? frontZoom : level;
           const label = level === 0 ? '0.5×' : level === 0.1 ? '1×' : '2×';
-
           return (
             <TouchableOpacity
               key={level}
@@ -130,7 +178,7 @@ export default function CameraScreen() {
 
       {/* Camera Controls */}
       <View style={styles.controls}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.flipButton}
           onPress={() => {
             setFacing(f => {
@@ -145,23 +193,62 @@ export default function CameraScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={takePicture} style={styles.captureButton}>
-          <Image 
+          <Image
             source={require('./waddl/Pretty/Camera_button.png')}
             style={styles.captureButtonImage}
             resizeMode="contain"
           />
         </TouchableOpacity>
 
-        {photoUri && (
+        {photoUri ? (
           <TouchableOpacity style={styles.thumbnail}>
             <Image source={{ uri: photoUri }} style={styles.thumbnailImage} />
           </TouchableOpacity>
+        ) : (
+          <View style={styles.thumbnailPlaceholder} />
         )}
-        {!photoUri && <View style={styles.thumbnailPlaceholder} />}
       </View>
     </View>
   );
 }
+
+// ── STYLES ───────────────────────────────────────────────────────
+
+const previewStyles = StyleSheet.create({
+  actions: {
+    position: 'absolute',
+    bottom: 50,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+  },
+  retakeBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 36,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  retakeText: {
+    color: 'white',
+    fontSize: 18,
+    fontFamily: 'LilitaOne_400Regular',
+  },
+  useBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 36,
+    borderRadius: 30,
+    backgroundColor: '#29412c',
+  },
+  useText: {
+    color: '#e4e1d3',
+    fontSize: 18,
+    fontFamily: 'LilitaOne_400Regular',
+  },
+});
 
 const styles = StyleSheet.create({
   logoContainer: {
@@ -176,10 +263,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  logo: {
-    height: 100,
-    width: 300,
-  },
+  logo: { height: 100, width: 300 },
   zoomIndicator: {
     position: 'absolute',
     top: 160,
@@ -227,20 +311,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.25)',
     borderColor: 'white',
   },
-  zoomBtnDisabled: {
-    opacity: 0.3,
-  },
-  zoomTextDisabled: {
-    color: 'rgba(255,255,255,0.3)',
-  },
+  zoomBtnDisabled: { opacity: 0.3 },
+  zoomTextDisabled: { color: 'rgba(255,255,255,0.3)' },
   zoomText: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
     fontFamily: 'LilitaOne_400Regular',
   },
-  zoomTextActive: {
-    color: 'white',
-  },
+  zoomTextActive: { color: 'white' },
   controls: {
     position: 'absolute',
     bottom: 40,
@@ -251,40 +329,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
   },
   flipButton: {
-    width: 50,
-    height: 50,
+    width: 50, height: 50,
     borderRadius: 25,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  flipIcon: {
-    fontSize: 24,
-  },
+  flipIcon: { fontSize: 24 },
   captureButton: {
-    width: 80,
-    height: 80,
+    width: 80, height: 80,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  captureButtonImage: {
-    width: 80,
-    height: 80,
-  },
+  captureButtonImage: { width: 80, height: 80 },
   thumbnail: {
-    width: 50,
-    height: 50,
+    width: 50, height: 50,
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'white',
   },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailPlaceholder: {
-    width: 50,
-    height: 50,
-  },
+  thumbnailImage: { width: '100%', height: '100%' },
+  thumbnailPlaceholder: { width: 50, height: 50 },
 });

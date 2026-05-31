@@ -3,6 +3,7 @@ import { StyleSheet, View, TouchableOpacity, Text, ActivityIndicator, Image } fr
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RADIUS_KEY, DEFAULT_RADIUS } from './Settings';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAthF2hGgMDjU9ip9T_jzBiJifp2N8E6w0';
 const DEFAULT_COORDS = { lat: 37.78825, lng: -122.4324 };
@@ -36,9 +37,12 @@ export default function MapScreen({ onBack }) {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
-  const [radius, setRadius] = useState(2);
 
-  // Returns true if a saved pin was restored
+  const getRadius = async () => {
+    const val = await AsyncStorage.getItem(RADIUS_KEY);
+    return val !== null ? parseFloat(val) : DEFAULT_RADIUS;
+  };
+
   const loadSavedPin = async () => {
     try {
       const saved = await AsyncStorage.getItem(PIN_KEY);
@@ -60,6 +64,7 @@ export default function MapScreen({ onBack }) {
     setSearching(true);
     setSearchError(null);
 
+    const radius = await getRadius();
     const targetMeters = radius * 1609.34;
     const toleranceMeters = 0.25 * 1609.34;
     const bearing = Math.random() * 2 * Math.PI;
@@ -114,7 +119,6 @@ export default function MapScreen({ onBack }) {
           const path = decodePolyline(route.polyline.encodedPolyline);
           setPolylinePath(path);
           setPinInfo({ pin: candidate, distance: `${distanceMiles} mi`, duration: durationText });
-
           await AsyncStorage.setItem(PIN_KEY, JSON.stringify({
             date: getTodayString(),
             pin: candidate,
@@ -134,7 +138,7 @@ export default function MapScreen({ onBack }) {
     }
 
     if (!found) {
-      setSearchError('Could not find a route within ±0.25 mi after 10 attempts. Try a different radius.');
+      setSearchError('Could not find a route within ±0.25 mi after 10 attempts. Try a different radius in Settings.');
     }
 
     setSearching(false);
@@ -144,7 +148,6 @@ export default function MapScreen({ onBack }) {
     (async () => {
       try {
         const hasSavedPin = await loadSavedPin();
-
         const { status } = await Location.requestForegroundPermissionsAsync();
         let coords;
         if (status !== 'granted') {
@@ -156,11 +159,7 @@ export default function MapScreen({ onBack }) {
         }
         setCenter(coords);
         setLoading(false);
-
-        // Auto-find a pin if none saved
-        if (!hasSavedPin) {
-          await dropPin(coords);
-        }
+        if (!hasSavedPin) await dropPin(coords);
       } catch (e) {
         setLocationError('Could not get location.');
         setCenter(DEFAULT_COORDS);
@@ -172,9 +171,8 @@ export default function MapScreen({ onBack }) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <Image 
+        <Image
           source={require('./waddl/Pretty/Top_logo.png')}
           style={styles.logo}
           resizeMode="contain"
@@ -195,27 +193,6 @@ export default function MapScreen({ onBack }) {
           )}
 
           <View style={styles.controls}>
-            <View style={styles.controlRow}>
-              <Text style={styles.controlLabel}>Radius</Text>
-              <View style={styles.radiusRow}>
-                <TouchableOpacity
-                  style={[styles.radiusBtn, searching && styles.radiusBtnDisabled]}
-                  onPress={() => setRadius(r => Math.max(0.25, parseFloat((r - 0.25).toFixed(2))))}
-                  disabled={searching}
-                >
-                  <Text style={styles.radiusBtnText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.radiusValue}>{radius} mi</Text>
-                <TouchableOpacity
-                  style={[styles.radiusBtn, searching && styles.radiusBtnDisabled]}
-                  onPress={() => setRadius(r => parseFloat((r + 0.25).toFixed(2)))}
-                  disabled={searching}
-                >
-                  <Text style={styles.radiusBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
             <TouchableOpacity
               style={[styles.dropBtn, searching && styles.dropBtnDisabled]}
               onPress={() => dropPin()}
@@ -281,22 +258,12 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  logo: {
-    height: 100,
-    width: 300,
-  },
+  logo: { height: 100, width: 300 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { fontSize: 16, fontFamily: 'LilitaOne_400Regular', color: '#666' },
   errorBanner: { backgroundColor: '#fff3cd', paddingVertical: 8, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#ffc107' },
   errorText: { color: '#856404', fontSize: 13, fontFamily: 'LilitaOne_400Regular' },
   controls: { backgroundColor: '#e4e1d3', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#d0cdb8', gap: 10 },
-  controlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  controlLabel: { fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#666' },
-  radiusRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  radiusBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#29412c', alignItems: 'center', justifyContent: 'center' },
-  radiusBtnDisabled: { backgroundColor: '#aaa' },
-  radiusBtnText: { color: '#e4e1d3', fontSize: 20, fontFamily: 'LilitaOne_400Regular', lineHeight: 22 },
-  radiusValue: { fontSize: 16, fontFamily: 'LilitaOne_400Regular', color: '#333', minWidth: 48, textAlign: 'center' },
   dropBtn: { backgroundColor: '#29412c', paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   dropBtnDisabled: { backgroundColor: '#aaa' },
   dropBtnText: { color: '#e4e1d3', fontFamily: 'LilitaOne_400Regular', fontSize: 15 },
