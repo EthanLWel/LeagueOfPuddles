@@ -1,25 +1,84 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, Image, TouchableOpacity,
-  Alert, StyleSheet, Dimensions, Modal, TextInput, ActivityIndicator
+  Alert, StyleSheet, Dimensions, Modal, TextInput,
+  ActivityIndicator, ScrollView, Platform
 } from 'react-native';
-import { ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { ref, deleteObject, listAll, getDownloadURL } from 'firebase/storage';
+import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, storage, db } from './firebase';
 
 const THUMB = Dimensions.get('window').width / 3 - 4;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const GOOGLE_MAPS_API_KEY = 'AIzaSyAthF2hGgMDjU9ip9T_jzBiJifp2N8E6w0';
+
+// ─── Route map slide ──────────────────────────────────────────────
+
+function RouteMapSlide({ route }) {
+  if (!route || route.length === 0) {
+    return (
+      <View style={modalStyles.noRoute}>
+        <Text style={modalStyles.noRouteText}>No route attached to this photo</Text>
+      </View>
+    );
+  }
+
+  if (Platform.OS === 'web') {
+    const pathParam = route
+      .filter((_, i) => i % Math.ceil(route.length / 50) === 0)
+      .map(p => `${p.lat},${p.lng}`)
+      .join('|');
+    const first = route[0];
+    const last = route[route.length - 1];
+    const url = `https://maps.googleapis.com/maps/api/staticmap?size=400x600&path=color:0x29412cff|weight:4|${pathParam}&markers=color:green|label:A|${first.lat},${first.lng}&markers=color:red|label:B|${last.lat},${last.lng}&key=${GOOGLE_MAPS_API_KEY}`;
+    return (
+      <View style={modalStyles.routeSlide}>
+        <Image source={{ uri: url }} style={modalStyles.staticMap} resizeMode="cover" />
+        <Text style={modalStyles.routeTitle}>Your Route</Text>
+      </View>
+    );
+  }
+
+  const MapView = require('react-native-maps').default;
+  const { Polyline, Marker } = require('react-native-maps');
+  const lats = route.map(p => p.latitude ?? p.lat);
+  const lngs = route.map(p => p.longitude ?? p.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const region = {
+    latitude: (minLat + maxLat) / 2,
+    longitude: (minLng + maxLng) / 2,
+    latitudeDelta: Math.max(0.01, (maxLat - minLat) * 1.4),
+    longitudeDelta: Math.max(0.01, (maxLng - minLng) * 1.4),
+  };
+  const coords = route.map(p => ({ latitude: p.latitude ?? p.lat, longitude: p.longitude ?? p.lng }));
+
+  return (
+    <View style={modalStyles.routeSlide}>
+      <MapView style={modalStyles.nativeMap} region={region} scrollEnabled={false} zoomEnabled={false}>
+        <Polyline coordinates={coords} strokeColor="#29412c" strokeWidth={4} />
+        <Marker coordinate={coords[0]} pinColor="green" />
+        <Marker coordinate={coords[coords.length - 1]} pinColor="red" />
+      </MapView>
+      <Text style={modalStyles.routeTitle}>Your Route</Text>
+    </View>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────
 
 export default function PhotoGallery({ onOpenSettings, user }) {
   const [photos, setPhotos] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [slideIndex, setSlideIndex] = useState(0);
   const [bio, setBio] = useState('Splashing through life, one puddle at a time 💦');
   const [editingBio, setEditingBio] = useState(false);
   const [bioInput, setBioInput] = useState('');
   const [loadingPhotos, setLoadingPhotos] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
-    // Wait for Firebase auth to be ready before loading
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
       if (firebaseUser) {
         loadPhotos(firebaseUser.uid);
@@ -34,15 +93,26 @@ export default function PhotoGallery({ onOpenSettings, user }) {
   const loadPhotos = async (uid) => {
     setLoadingPhotos(true);
     try {
+      // Load storage items
       const userPhotosRef = ref(storage, `photos/${uid}/`);
       const result = await listAll(userPhotosRef);
-      const urls = await Promise.all(
+      const photos = await Promise.all(
         result.items.map(async (item) => {
           const url = await getDownloadURL(item);
-          return { uri: url, ref: item.fullPath };
+          const filename = item.name;
+
+          // Try to load matching Firestore metadata for route
+          let route = null;
+          try {
+            const metaDoc = await getDoc(doc(db, 'photos', filename));
+            if (metaDoc.exists()) route = metaDoc.data().route ?? null;
+          } catch (e) {}
+
+          return { uri: url, ref: item.fullPath, filename, route };
         })
       );
-      setPhotos(urls);
+      // Most recent photo first
+      setPhotos(photos.reverse());
     } catch (e) {
       console.error('Failed to load photos:', e);
     } finally {
@@ -58,25 +128,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
       }
     } catch (e) {
       console.error('Failed to load bio:', e);
-    }
-  };
-
-  const uploadPhoto = async (uri) => {
-    const firebaseUser = auth.currentUser;
-    if (!firebaseUser) return;
-    setUploading(true);
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const filename = `${Date.now()}.jpg`;
-      const photoRef = ref(storage, `photos/${firebaseUser.uid}/${filename}`);
-      await uploadBytes(photoRef, blob);
-      const url = await getDownloadURL(photoRef);
-      setPhotos(prev => [...prev, { uri: url, ref: photoRef.fullPath }]);
-    } catch (e) {
-      Alert.alert('Upload failed', e.message);
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -111,6 +162,17 @@ export default function PhotoGallery({ onOpenSettings, user }) {
         }
       }
     ]);
+  };
+
+  const openPhoto = (photo) => {
+    setSelectedPhoto(photo);
+    setSlideIndex(0);
+    setTimeout(() => scrollRef.current?.scrollTo({ x: 0, animated: false }), 50);
+  };
+
+  const onScroll = (e) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    setSlideIndex(idx);
   };
 
   return (
@@ -196,8 +258,13 @@ export default function PhotoGallery({ onOpenSettings, user }) {
           numColumns={3}
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => setSelectedPhoto(item)} style={styles.thumb}>
+            <TouchableOpacity onPress={() => openPhoto(item)} style={styles.thumb}>
               <Image source={{ uri: item.uri }} style={styles.image} />
+              {item.route && (
+                <View style={styles.routeBadge}>
+                  <Text style={styles.routeBadgeText}>🗺</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
         />
@@ -206,23 +273,57 @@ export default function PhotoGallery({ onOpenSettings, user }) {
       {/* Full Photo Modal */}
       {selectedPhoto && (
         <Modal visible={!!selectedPhoto} transparent onRequestClose={() => setSelectedPhoto(null)}>
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              style={styles.modalCloseArea}
-              onPress={() => setSelectedPhoto(null)}
-              activeOpacity={1}
-            >
-              <Image source={{ uri: selectedPhoto.uri }} style={styles.fullImage} resizeMode="contain" />
-              <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedPhoto(null)}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={(e) => { e.stopPropagation(); handleDelete(selectedPhoto); }}
-              >
-                <Text style={styles.actionButtonText}>🗑</Text>
-              </TouchableOpacity>
+          <View style={modalStyles.overlay}>
+
+            {/* Close button */}
+            <TouchableOpacity style={modalStyles.closeButton} onPress={() => setSelectedPhoto(null)}>
+              <Text style={modalStyles.closeButtonText}>✕</Text>
             </TouchableOpacity>
+
+            {/* Slide dots */}
+            <View style={modalStyles.dots}>
+              <View style={[modalStyles.dot, slideIndex === 0 && modalStyles.dotActive]} />
+              <View style={[modalStyles.dot, slideIndex === 1 && modalStyles.dotActive]} />
+            </View>
+
+            {/* Swipeable slides */}
+            <ScrollView
+              ref={scrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={onScroll}
+              style={{ flex: 1 }}
+            >
+              {/* Slide 1: Photo */}
+              <View style={modalStyles.slide}>
+                <Image
+                  source={{ uri: selectedPhoto.uri }}
+                  style={modalStyles.fullImage}
+                  resizeMode="contain"
+                />
+                <View style={modalStyles.photoActions}>
+                  <TouchableOpacity
+                    style={modalStyles.deleteButton}
+                    onPress={() => handleDelete(selectedPhoto)}
+                  >
+                    <Text style={modalStyles.actionButtonText}>🗑</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Slide 2: Route */}
+              <View style={modalStyles.slide}>
+                <RouteMapSlide route={selectedPhoto.route} />
+              </View>
+            </ScrollView>
+
+            {/* Swipe hint */}
+            {slideIndex === 0 && selectedPhoto.route && (
+              <View style={modalStyles.swipeHint}>
+                <Text style={modalStyles.swipeHintText}>Swipe for route →</Text>
+              </View>
+            )}
           </View>
         </Modal>
       )}
@@ -230,12 +331,52 @@ export default function PhotoGallery({ onOpenSettings, user }) {
   );
 }
 
-export { };
+// ─── Styles ───────────────────────────────────────────────────────
+
+const modalStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
+  closeButton: {
+    position: 'absolute', top: 50, right: 20, zIndex: 10,
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center',
+  },
+  closeButtonText: { color: 'white', fontSize: 28, fontFamily: 'LilitaOne_400Regular' },
+  dots: {
+    position: 'absolute', bottom: 20, width: '100%',
+    flexDirection: 'row', justifyContent: 'center', gap: 8, zIndex: 10,
+  },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.4)' },
+  dotActive: { backgroundColor: 'white' },
+  slide: {
+    width: SCREEN_WIDTH, height: SCREEN_HEIGHT,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  fullImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.75 },
+  photoActions: { flexDirection: 'row', gap: 20, marginTop: 20 },
+  deleteButton: {
+    width: 55, height: 55, borderRadius: 27.5,
+    backgroundColor: 'rgba(200,0,0,0.85)', justifyContent: 'center', alignItems: 'center',
+  },
+  actionButtonText: { fontSize: 24 },
+  routeSlide: { width: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  routeTitle: { color: 'white', fontSize: 20, fontFamily: 'LilitaOne_400Regular' },
+  staticMap: { width: SCREEN_WIDTH - 64, height: (SCREEN_WIDTH - 64) * 1.5, borderRadius: 12 },
+  nativeMap: { width: SCREEN_WIDTH - 64, height: (SCREEN_WIDTH - 64) * 1.5, borderRadius: 12 },
+  noRoute: { alignItems: 'center', paddingTop: 40 },
+  noRouteText: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
+  swipeHint: { position: 'absolute', bottom: 45, width: '100%', alignItems: 'center' },
+  swipeHintText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontFamily: 'LilitaOne_400Regular' },
+});
 
 const styles = StyleSheet.create({
   grid: { padding: 2 },
   thumb: { width: THUMB, height: THUMB * 1.4, margin: 2 },
   image: { width: '100%', height: '100%', borderRadius: 4 },
+  routeBadge: {
+    position: 'absolute', top: 4, right: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, padding: 2,
+  },
+  routeBadgeText: { fontSize: 12 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
   emptyIcon: { fontSize: 80 },
   emptyText: { color: '#333', fontSize: 20, fontFamily: 'LilitaOne_400Regular' },
@@ -246,21 +387,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#b0d4b4',
   },
   uploadingText: { fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
-  modalCloseArea: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' },
-  fullImage: { width: '100%', height: '80%' },
-  closeButton: {
-    position: 'absolute', top: 50, right: 20,
-    width: 50, height: 50, borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center',
-  },
-  closeButtonText: { color: 'white', fontSize: 28, fontFamily: 'LilitaOne_400Regular' },
-  deleteButton: {
-    position: 'absolute', bottom: 80, right: 30,
-    width: 55, height: 55, borderRadius: 27.5,
-    backgroundColor: 'rgba(200,0,0,0.85)', justifyContent: 'center', alignItems: 'center',
-  },
-  actionButtonText: { fontSize: 24 },
 });
 
 const galleryStyles = StyleSheet.create({

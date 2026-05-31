@@ -2,7 +2,9 @@ import React, { useState, useRef } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { auth, storage } from './firebase';
+import { auth, storage, db } from './firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, TouchableOpacity, Image, Linking, StyleSheet, PanResponder, Platform, ActivityIndicator } from 'react-native';
 
 export default function CameraScreen() {
@@ -53,7 +55,6 @@ export default function CameraScreen() {
   const takePicture = async () => {
     if (!cameraRef.current) return;
     try {
-      // Web needs a short delay for the video feed to be ready
       if (Platform.OS === 'web') {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -65,13 +66,23 @@ export default function CameraScreen() {
     }
   };
 
-  // Upload photo to Firebase Storage
   const confirmPhoto = async () => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
       console.error('No Firebase user logged in');
       return;
     }
+
+    let route = null;
+    try {
+      if (Platform.OS === 'web') {
+        const saved = localStorage.getItem('daily_pin');
+        if (saved) route = JSON.parse(saved).path ?? null;
+      } else {
+        const saved = await AsyncStorage.getItem('daily_pin');
+        if (saved) route = JSON.parse(saved).path ?? null;
+      }
+    } catch (e) {}
 
     setUploading(true);
     try {
@@ -80,7 +91,15 @@ export default function CameraScreen() {
       const filename = `${Date.now()}.jpg`;
       const photoRef = ref(storage, `photos/${firebaseUser.uid}/${filename}`);
       await uploadBytes(photoRef, blob);
-      await getDownloadURL(photoRef);
+      const downloadURL = await getDownloadURL(photoRef);
+
+      await setDoc(doc(db, 'photos', filename), {
+        uid: firebaseUser.uid,
+        url: downloadURL,
+        filename,
+        savedAt: Date.now(),
+        route: route ?? null,
+      });
 
       setPhotoUri(previewUri);
       setUploadDone(true);
@@ -120,6 +139,9 @@ export default function CameraScreen() {
   }
 
   const zoomLabel = zoom < 0.0075 ? '0.5×' : zoom < 0.05 ? '1×' : '2×';
+
+  // 0.5× uses -1 on Android to trigger the ultrawide lens; 0 on iOS/web
+  const ultrawideZoom = Platform.OS === 'android' ? -1 : 0;
 
   // ── PREVIEW SCREEN ──────────────────────────────────────────────
   if (previewUri) {
@@ -185,8 +207,11 @@ export default function CameraScreen() {
             const isFront = facing === 'front';
             const isUltrawide = level === 0;
             const disabled = isFront && isUltrawide;
-            const frontZoom = level === 0 ? null : level === 0.1 ? 0 : 0.1;
-            const actualZoom = isFront ? frontZoom : level;
+            // For front camera, 1× = zoom 0, 2× = zoom 0.1 (same as before)
+            // For back camera, ultrawide uses ultrawideZoom (-1 Android, 0 iOS)
+            const actualZoom = isFront
+              ? (level === 0 ? null : level === 0.1 ? 0 : 0.1)
+              : (level === 0 ? ultrawideZoom : level);
             const label = level === 0 ? '0.5×' : level === 0.1 ? '1×' : '2×';
             return (
               <TouchableOpacity
