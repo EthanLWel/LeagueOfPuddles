@@ -10,6 +10,9 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "We need access to your camera to take photos",
+        "bundleIdentifier": "com.leagueofpuddles",
+        "googleServicesFile": "./GoogleService-Info.plist",
+        "supportsTablet": true,
         "NSPhotoLibraryAddUsageDescription": "We need to save photos to your library"
       }
     },
@@ -19,6 +22,8 @@
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE"
       ],
+      "package": "com.leagueofpuddles",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

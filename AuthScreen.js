@@ -3,52 +3,60 @@ import {
   StyleSheet, View, Text, TextInput,
   TouchableOpacity, ActivityIndicator, Image, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const USERS_KEY = 'registered_users';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
 export default function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState('login');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const getUsers = async () => {
-    try {
-      const raw = await AsyncStorage.getItem(USERS_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      return [];
-    }
-  };
-
-  const saveUsers = async (users) => {
-    await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
-  };
-
   const switchMode = (newMode) => {
     setMode(newMode);
     setError(null);
     setUsername('');
+    setEmail('');
     setPassword('');
     setConfirmPassword('');
   };
 
+  const getFriendlyError = (code) => {
+    switch (code) {
+      case 'auth/email-already-in-use': return 'That email is already registered.';
+      case 'auth/invalid-email': return 'Please enter a valid email address.';
+      case 'auth/weak-password': return 'Password must be at least 6 characters.';
+      case 'auth/user-not-found': return 'No account found with that email.';
+      case 'auth/wrong-password': return 'Incorrect password.';
+      case 'auth/invalid-credential': return 'Invalid email or password.';
+      default: return 'Something went wrong. Please try again.';
+    }
+  };
+
   const submit = async () => {
-    if (!username.trim() || !password.trim()) {
-      setError('Please enter a username and password');
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter an email and password.');
       return;
     }
-
     if (mode === 'register') {
-      if (password !== confirmPassword) {
-        setError('Passwords do not match');
+      if (!username.trim()) {
+        setError('Please enter a username.');
         return;
       }
-      if (password.length < 4) {
-        setError('Password must be at least 4 characters');
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters.');
         return;
       }
     }
@@ -57,31 +65,33 @@ export default function AuthScreen({ onAuth }) {
     setError(null);
 
     try {
-      const users = await getUsers();
-
       if (mode === 'register') {
-        const exists = users.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
-        if (exists) {
-          setError('Username already taken');
-          setLoading(false);
-          return;
-        }
-        const newUser = { id: Date.now().toString(), username: username.trim(), password };
-        await saveUsers([...users, newUser]);
-        onAuth({ id: newUser.id, username: newUser.username });
+        // Create Firebase Auth user
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+
+        // Set display name
+        await updateProfile(cred.user, { displayName: username.trim() });
+
+        // Save user profile to Firestore
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          uid: cred.user.uid,
+          username: username.trim(),
+          email: email.trim(),
+          bio: 'Splashing through life, one puddle at a time 💦',
+          createdAt: new Date().toISOString(),
+        });
+
+        onAuth({ id: cred.user.uid, username: username.trim() });
+
       } else {
-        const user = users.find(
-          u => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password
-        );
-        if (!user) {
-          setError('Invalid username or password');
-          setLoading(false);
-          return;
-        }
-        onAuth({ id: user.id, username: user.username });
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        onAuth({
+          id: cred.user.uid,
+          username: cred.user.displayName || cred.user.email,
+        });
       }
     } catch (e) {
-      setError('Something went wrong, please try again');
+      setError(getFriendlyError(e.code));
     } finally {
       setLoading(false);
     }
@@ -103,14 +113,27 @@ export default function AuthScreen({ onAuth }) {
           {mode === 'login' ? 'Welcome back!' : 'Create account'}
         </Text>
 
+        {mode === 'register' && (
+          <TextInput
+            style={styles.input}
+            placeholder="Username"
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+            value={username}
+            onChangeText={setUsername}
+          />
+        )}
+
         <TextInput
           style={styles.input}
-          placeholder="Username"
+          placeholder="Email"
           placeholderTextColor="#999"
           autoCapitalize="none"
-          value={username}
-          onChangeText={setUsername}
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
         />
+
         <TextInput
           style={styles.input}
           placeholder="Password"
@@ -175,12 +198,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d0cdb8',
   },
-  inputError: {
-    borderColor: '#c0392b',
-  },
-  inputSuccess: {
-    borderColor: '#29412c',
-  },
+  inputError: { borderColor: '#c0392b' },
+  inputSuccess: { borderColor: '#29412c' },
   error: { color: '#c00', fontSize: 13, fontFamily: 'LilitaOne_400Regular', textAlign: 'center' },
   btn: {
     width: '100%',
