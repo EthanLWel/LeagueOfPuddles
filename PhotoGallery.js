@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, Image, TouchableOpacity,
-  Alert, StyleSheet, Dimensions, Modal, TextInput,
+  Alert, StyleSheet, Dimensions, Modal,
   ActivityIndicator, ScrollView, Platform
 } from 'react-native';
 import { ref, deleteObject, listAll, getDownloadURL } from 'firebase/storage';
-import { doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, storage, db } from './firebase';
 
 // Only import react-native-maps on native — never on web
@@ -42,7 +42,6 @@ function RouteMapSlide({ route }) {
     );
   }
 
-  // Native: use the separately imported component so web never bundles react-native-maps
   return (
     <View style={modalStyles.routeSlide}>
       <RouteMapNative route={route} />
@@ -57,8 +56,7 @@ export default function PhotoGallery({ onOpenSettings, user }) {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [slideIndex, setSlideIndex] = useState(0);
   const [bio, setBio] = useState('Splashing through life, one puddle at a time 💦');
-  const [editingBio, setEditingBio] = useState(false);
-  const [bioInput, setBioInput] = useState('');
+  const [pfpUri, setPfpUri] = useState(null);
   const [loadingPhotos, setLoadingPhotos] = useState(true);
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef(null);
@@ -67,7 +65,7 @@ export default function PhotoGallery({ onOpenSettings, user }) {
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
       if (firebaseUser) {
         loadPhotos(firebaseUser.uid);
-        loadBio(firebaseUser.uid);
+        loadProfile(firebaseUser.uid);
       } else {
         setLoadingPhotos(false);
       }
@@ -92,7 +90,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
           return { uri: url, ref: item.fullPath, filename, route };
         })
       );
-      // Most recent photo first
       setPhotos(photos.reverse());
     } catch (e) {
       console.error('Failed to load photos:', e);
@@ -101,29 +98,16 @@ export default function PhotoGallery({ onOpenSettings, user }) {
     }
   };
 
-  const loadBio = async (uid) => {
+  const loadProfile = async (uid) => {
     try {
       const userDoc = await getDoc(doc(db, 'users', uid));
-      if (userDoc.exists() && userDoc.data().bio) {
-        setBio(userDoc.data().bio);
+      if (userDoc.exists()) {
+        if (userDoc.data().bio) setBio(userDoc.data().bio);
+        if (userDoc.data().pfpUrl) setPfpUri(userDoc.data().pfpUrl);
       }
     } catch (e) {
-      console.error('Failed to load bio:', e);
+      console.error('Failed to load profile:', e);
     }
-  };
-
-  const saveBio = async () => {
-    const firebaseUser = auth.currentUser;
-    const trimmed = bioInput.trim();
-    if (trimmed && firebaseUser) {
-      setBio(trimmed);
-      try {
-        await updateDoc(doc(db, 'users', firebaseUser.uid), { bio: trimmed });
-      } catch (e) {
-        console.error('Failed to save bio:', e);
-      }
-    }
-    setEditingBio(false);
   };
 
   const handleDelete = (photo) => {
@@ -176,40 +160,19 @@ export default function PhotoGallery({ onOpenSettings, user }) {
       {/* Profile Section */}
       <View style={galleryStyles.profileSection}>
         <View style={galleryStyles.profilePic}>
-          <Image
-            source={require('./waddl/Pretty/waddl.png')}
-            style={galleryStyles.profileImage}
-            resizeMode="cover"
-          />
+          {pfpUri ? (
+            <Image source={{ uri: pfpUri }} style={galleryStyles.profileImage} resizeMode="cover" />
+          ) : (
+            <Image
+              source={require('./waddl/Pretty/waddl.png')}
+              style={galleryStyles.profileImage}
+              resizeMode="cover"
+            />
+          )}
         </View>
         <Text style={galleryStyles.username}>@{user?.username ?? 'Unknown'}</Text>
-
-        {editingBio ? (
-          <View style={galleryStyles.bioEditContainer}>
-            <TextInput
-              style={galleryStyles.bioInput}
-              value={bioInput}
-              onChangeText={setBioInput}
-              multiline
-              maxLength={100}
-              autoFocus
-              placeholder="Write your bio..."
-              placeholderTextColor="#999"
-            />
-            <View style={galleryStyles.bioEditButtons}>
-              <TouchableOpacity style={galleryStyles.bioCancelBtn} onPress={() => setEditingBio(false)}>
-                <Text style={galleryStyles.bioCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={galleryStyles.bioSaveBtn} onPress={saveBio}>
-                <Text style={galleryStyles.bioSaveText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <TouchableOpacity onPress={() => { setBioInput(bio); setEditingBio(true); }}>
-            <Text style={galleryStyles.bio}>{bio}</Text>
-          </TouchableOpacity>
-        )}
+        {/* Bio is read-only here — edit it in Settings */}
+        <Text style={galleryStyles.bio}>{bio}</Text>
       </View>
 
       {/* Upload indicator */}
@@ -256,18 +219,15 @@ export default function PhotoGallery({ onOpenSettings, user }) {
         <Modal visible={!!selectedPhoto} transparent onRequestClose={() => setSelectedPhoto(null)}>
           <View style={modalStyles.overlay}>
 
-            {/* Close button */}
             <TouchableOpacity style={modalStyles.closeButton} onPress={() => setSelectedPhoto(null)}>
               <Text style={modalStyles.closeButtonText}>✕</Text>
             </TouchableOpacity>
 
-            {/* Slide dots */}
             <View style={modalStyles.dots}>
               <View style={[modalStyles.dot, slideIndex === 0 && modalStyles.dotActive]} />
               <View style={[modalStyles.dot, slideIndex === 1 && modalStyles.dotActive]} />
             </View>
 
-            {/* Swipeable slides */}
             <ScrollView
               ref={scrollRef}
               horizontal
@@ -299,7 +259,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
               </View>
             </ScrollView>
 
-            {/* Swipe hint */}
             {slideIndex === 0 && selectedPhoto.route && (
               <View style={modalStyles.swipeHint}>
                 <Text style={modalStyles.swipeHintText}>Swipe for route →</Text>
@@ -390,16 +349,4 @@ const galleryStyles = StyleSheet.create({
   profileImage: { width: '100%', height: '100%' },
   username: { fontSize: 20, fontFamily: 'LilitaOne_400Regular', color: '#29412c', marginBottom: 8 },
   bio: { fontSize: 14, fontFamily: 'LilitaOne_400Regular', color: '#29412c', textAlign: 'center', paddingHorizontal: 40 },
-  bioEditContainer: { width: '80%', alignItems: 'center', gap: 8 },
-  bioInput: {
-    width: '100%', backgroundColor: '#fff', borderRadius: 10,
-    padding: 10, fontSize: 14, fontFamily: 'LilitaOne_400Regular',
-    color: '#333', borderWidth: 1, borderColor: '#d0cdb8',
-    textAlign: 'center', minHeight: 60,
-  },
-  bioEditButtons: { flexDirection: 'row', gap: 10 },
-  bioCancelBtn: { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: '#29412c' },
-  bioCancelText: { fontFamily: 'LilitaOne_400Regular', color: '#29412c', fontSize: 14 },
-  bioSaveBtn: { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, backgroundColor: '#29412c' },
-  bioSaveText: { fontFamily: 'LilitaOne_400Regular', color: '#e4e1d3', fontSize: 14 },
 });
