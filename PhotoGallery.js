@@ -7,49 +7,10 @@ import {
 import { ref, deleteObject, listAll, getDownloadURL } from 'firebase/storage';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, storage, db } from './firebase';
-
-// Only import react-native-maps on native — never on web
-const RouteMapNative = Platform.OS !== 'web' ? require('./RouteMapNative').default : null;
+import RouteMap from './RouteMap';
 
 const THUMB = Dimensions.get('window').width / 3 - 4;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const GOOGLE_MAPS_API_KEY = 'AIzaSyAthF2hGgMDjU9ip9T_jzBiJifp2N8E6w0';
-
-// ─── Route map slide ──────────────────────────────────────────────
-
-function RouteMapSlide({ route }) {
-  if (!route || route.length === 0) {
-    return (
-      <View style={modalStyles.noRoute}>
-        <Text style={modalStyles.noRouteText}>No route attached to this photo</Text>
-      </View>
-    );
-  }
-
-  if (Platform.OS === 'web') {
-    const pathParam = route
-      .filter((_, i) => i % Math.ceil(route.length / 50) === 0)
-      .map(p => `${p.lat},${p.lng}`)
-      .join('|');
-    const first = route[0];
-    const last = route[route.length - 1];
-    const url = `https://maps.googleapis.com/maps/api/staticmap?size=400x600&path=color:0x29412cff|weight:4|${pathParam}&markers=color:green|label:A|${first.lat},${first.lng}&markers=color:red|label:B|${last.lat},${last.lng}&key=${GOOGLE_MAPS_API_KEY}`;
-    return (
-      <View style={modalStyles.routeSlide}>
-        <Image source={{ uri: url }} style={modalStyles.staticMap} resizeMode="cover" />
-        <Text style={modalStyles.routeTitle}>Your Route</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={modalStyles.routeSlide}>
-      <RouteMapNative route={route} />
-    </View>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────
 
 export default function PhotoGallery({ onOpenSettings, user }) {
   const [photos, setPhotos] = useState([]);
@@ -140,6 +101,8 @@ export default function PhotoGallery({ onOpenSettings, user }) {
     setSlideIndex(idx);
   };
 
+  const hasRoute = selectedPhoto?.route && selectedPhoto.route.length > 0;
+
   return (
     <View style={{ flex: 1, backgroundColor: '#e4e1d3' }}>
 
@@ -171,7 +134,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
           )}
         </View>
         <Text style={galleryStyles.username}>@{user?.username ?? 'Unknown'}</Text>
-        {/* Bio is read-only here — edit it in Settings */}
         <Text style={galleryStyles.bio}>{bio}</Text>
       </View>
 
@@ -223,10 +185,12 @@ export default function PhotoGallery({ onOpenSettings, user }) {
               <Text style={modalStyles.closeButtonText}>✕</Text>
             </TouchableOpacity>
 
-            <View style={modalStyles.dots}>
-              <View style={[modalStyles.dot, slideIndex === 0 && modalStyles.dotActive]} />
-              <View style={[modalStyles.dot, slideIndex === 1 && modalStyles.dotActive]} />
-            </View>
+            {hasRoute && (
+              <View style={modalStyles.dots}>
+                <View style={[modalStyles.dot, slideIndex === 0 && modalStyles.dotActive]} />
+                <View style={[modalStyles.dot, slideIndex === 1 && modalStyles.dotActive]} />
+              </View>
+            )}
 
             <ScrollView
               ref={scrollRef}
@@ -234,6 +198,7 @@ export default function PhotoGallery({ onOpenSettings, user }) {
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               onMomentumScrollEnd={onScroll}
+              scrollEnabled={hasRoute}
               style={{ flex: 1 }}
             >
               {/* Slide 1: Photo */}
@@ -254,12 +219,14 @@ export default function PhotoGallery({ onOpenSettings, user }) {
               </View>
 
               {/* Slide 2: Route */}
-              <View style={modalStyles.slide}>
-                <RouteMapSlide route={selectedPhoto.route} />
-              </View>
+              {hasRoute && (
+                <View style={modalStyles.slide}>
+                  <RouteMap route={selectedPhoto.route} />
+                </View>
+              )}
             </ScrollView>
 
-            {slideIndex === 0 && selectedPhoto.route && (
+            {slideIndex === 0 && hasRoute && (
               <View style={modalStyles.swipeHint}>
                 <Text style={modalStyles.swipeHintText}>Swipe for route →</Text>
               </View>
@@ -270,8 +237,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────
 
 const modalStyles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
@@ -298,11 +263,6 @@ const modalStyles = StyleSheet.create({
     backgroundColor: 'rgba(200,0,0,0.85)', justifyContent: 'center', alignItems: 'center',
   },
   actionButtonText: { fontSize: 24 },
-  routeSlide: { width: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  routeTitle: { color: 'white', fontSize: 20, fontFamily: 'LilitaOne_400Regular' },
-  staticMap: { width: SCREEN_WIDTH - 64, height: (SCREEN_WIDTH - 64) * 1.5, borderRadius: 12 },
-  noRoute: { alignItems: 'center', paddingTop: 40 },
-  noRouteText: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
   swipeHint: { position: 'absolute', bottom: 45, width: '100%', alignItems: 'center' },
   swipeHintText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontFamily: 'LilitaOne_400Regular' },
 });

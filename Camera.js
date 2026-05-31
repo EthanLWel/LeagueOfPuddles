@@ -94,12 +94,13 @@ export default function CameraScreen() {
       const downloadURL = await getDownloadURL(photoRef);
 
       await setDoc(doc(db, 'photos', filename), {
-        uid: firebaseUser.uid,
-        url: downloadURL,
-        filename,
-        savedAt: Date.now(),
-        route: route ?? null,
+      uid: firebaseUser.uid,
+      url: downloadURL,
+      filename,
+      savedAt: Date.now(),
+      route: route ?? null,
       });
+console.log('Saved to Firestore with route:', route ? `${route.length} points` : 'null');
 
       setPhotoUri(previewUri);
       setUploadDone(true);
