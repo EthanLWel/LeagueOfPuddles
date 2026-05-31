@@ -45,8 +45,8 @@ export default function MapScreen() {
   const [searchError, setSearchError] = useState(null);
   const [friends, setFriends] = useState([]);
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [sharing, setSharing] = useState(false);
-  const [sharedWith, setSharedWith] = useState(null);
+  const [sharedWith, setSharedWith] = useState(null)
+  const [sharingUid, setSharingUid] = useState(null);
   const locationSubscription = useRef(null);
   const initializedRef = useRef(false);
   const isSharedPin = useRef(false);
@@ -118,9 +118,10 @@ export default function MapScreen() {
     return false;
   };
 
+  // Replace the setSharing calls in sendPinShare:
   const sendPinShare = async (friend) => {
     if (!pinInfo) return;
-    setSharing(true);
+    setSharingUid(friend.uid);  // only mark this specific friend
     try {
       const uid = auth.currentUser?.uid;
       const userDoc = await getDoc(doc(db, 'users', uid));
@@ -146,7 +147,7 @@ export default function MapScreen() {
       console.error('Failed to share pin:', e);
       Alert.alert('Error', 'Could not send pin request. Try again.');
     } finally {
-      setSharing(false);
+      setSharingUid(null);  // clear regardless of success/failure
     }
   };
 
@@ -503,7 +504,7 @@ export default function MapScreen() {
                   key={friend.uid}
                   style={styles.friendRow}
                   onPress={() => sendPinShare(friend)}
-                  disabled={sharing}
+                  disabled={sharingUid !== null}
                 >
                   <View style={styles.friendAvatar}>
                     {friend.pfpUrl ? (
@@ -515,7 +516,7 @@ export default function MapScreen() {
                     )}
                   </View>
                   <Text style={styles.friendName}>@{friend.username}</Text>
-                  {sharing ? (
+                  {sharingUid === friend.uid ? (
                     <ActivityIndicator size="small" color="#29412c" />
                   ) : (
                     <Image
