@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Switch, TouchableOpacity, Image } from 'react-native';
 
-export default function Settings({ onBack }) {
+export default function Settings({ onBack, onLogout, user }) {
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
   const [darkMode, setDarkMode] = React.useState(false);
 
@@ -11,7 +11,7 @@ export default function Settings({ onBack }) {
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Image 
+        <Image
           source={require('./waddl/Pretty/Top_logo.png')}
           style={styles.logo}
           resizeMode="contain"
@@ -19,23 +19,32 @@ export default function Settings({ onBack }) {
         <View style={styles.placeholder} />
       </View>
 
+      {/* Profile section */}
+      <View style={styles.profileSection}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {user?.username?.[0]?.toUpperCase() ?? '?'}
+          </Text>
+        </View>
+        <Text style={styles.username}>{user?.username ?? 'Unknown'}</Text>
+        <Text style={styles.userId}>ID: {user?.id ?? '-'}</Text>
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Preferences</Text>
-
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Notifications</Text>
-          <Switch 
-            value={notificationsEnabled} 
+          <Switch
+            value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
             trackColor={{ false: '#ccc', true: '#29412c' }}
             thumbColor={notificationsEnabled ? '#e4e1d3' : '#f4f3f4'}
           />
         </View>
-
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Dark Mode</Text>
-          <Switch 
-            value={darkMode} 
+          <Switch
+            value={darkMode}
             onValueChange={setDarkMode}
             trackColor={{ false: '#ccc', true: '#29412c' }}
             thumbColor={darkMode ? '#e4e1d3' : '#f4f3f4'}
@@ -50,6 +59,10 @@ export default function Settings({ onBack }) {
           <Text style={styles.aboutValue}>1.0.0</Text>
         </View>
       </View>
+
+      <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+        <Text style={styles.logoutText}>Log Out</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -84,6 +97,36 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 60,
+  },
+  profileSection: {
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 8,
+    gap: 6,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#29412c',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  avatarText: {
+    color: '#e4e1d3',
+    fontSize: 32,
+    fontFamily: 'LilitaOne_400Regular',
+  },
+  username: {
+    fontSize: 22,
+    fontFamily: 'LilitaOne_400Regular',
+    color: '#29412c',
+  },
+  userId: {
+    fontSize: 12,
+    fontFamily: 'LilitaOne_400Regular',
+    color: '#999',
   },
   section: {
     backgroundColor: '#e4e1d3',
@@ -133,5 +176,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'LilitaOne_400Regular',
     color: '#666',
+  },
+  logoutBtn: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    backgroundColor: '#c0392b',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  logoutText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'LilitaOne_400Regular',
   },
 });

@@ -9,8 +9,10 @@ import CameraScreen from './Camera';
 import MapScreen from './MapScreen';
 import PhotoGallery from './PhotoGallery';
 import Settings from './Settings';
+import AuthScreen from './AuthScreen';
 
 const TODAY_KEY = 'last_opened_date';
+const USER_KEY = 'logged_in_user';
 const PHOTOS_DIR = FileSystem.documentDirectory + 'photos/';
 
 function getTodayString() {
@@ -22,6 +24,8 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [showSettings, setShowSettings] = useState(false);
   const [dailyResetKey, setDailyResetKey] = useState(null);
+  const [user, setUser] = useState(null); // { id, username }
+  const [authChecked, setAuthChecked] = useState(false);
 
   const [fontsLoaded] = useFonts({
     LilitaOne_400Regular,
@@ -29,6 +33,12 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      // Check for saved login
+      try {
+        const saved = await AsyncStorage.getItem(USER_KEY);
+        if (saved) setUser(JSON.parse(saved));
+      } catch (e) {}
+
       const today = getTodayString();
       const lastOpened = await AsyncStorage.getItem(TODAY_KEY);
       
@@ -42,37 +52,58 @@ export default function App() {
         } catch (e) {
           console.log('Error clearing photos:', e);
         }
+
+        // Clear daily pin
+        try {
+          if (typeof localStorage !== 'undefined') localStorage.removeItem('daily_pin');
+          await AsyncStorage.removeItem('daily_pin');
+        } catch (e) {}
         
         await AsyncStorage.setItem(TODAY_KEY, today);
         setDailyResetKey(today);
       } else {
         setDailyResetKey(today);
       }
+
+      setAuthChecked(true);
     })();
   }, []);
+
+  const handleAuth = async (userData) => {
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
+    setUser(userData);
+  };
+
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem(USER_KEY);
+    setUser(null);
+    setCurrentScreen('home');
+  };
 
   const navigateTo = (screen) => {
     setCurrentScreen(screen);
     setShowSettings(false);
   };
 
-  if (!dailyResetKey || !fontsLoaded) return null;
+  if (!authChecked || !dailyResetKey || !fontsLoaded) return null;
+
+  if (!user) return <AuthScreen onAuth={handleAuth} />;
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       
-      {currentScreen === 'home' && <HomeFeed />}
+      {currentScreen === 'home' && <HomeFeed user={user} />}
       
-      {currentScreen === 'camera' && <CameraScreen />}
+      {currentScreen === 'camera' && <CameraScreen user={user} />}
       
-      {currentScreen === 'maps' && <MapScreen />}
+      {currentScreen === 'maps' && <MapScreen key={dailyResetKey} />}
       
       {currentScreen === 'gallery' && (
         showSettings ? (
-          <Settings onBack={() => setShowSettings(false)} />
+          <Settings onBack={() => setShowSettings(false)} onLogout={handleLogout} user={user} />
         ) : (
-          <PhotoGallery onOpenSettings={() => setShowSettings(true)} />
+          <PhotoGallery onOpenSettings={() => setShowSettings(true)} user={user} />
         )
       )}
 

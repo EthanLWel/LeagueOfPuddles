@@ -1,20 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, Image, TouchableOpacity,
-  Alert, StyleSheet, Dimensions, Modal
+  Alert, StyleSheet, Dimensions, Modal, TextInput
 } from 'react-native';
-import * as MediaLibrary from 'expo-media-library';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSavedPhotos, deletePhoto, downloadToGallery } from './photoStorage';
 
 const THUMB = Dimensions.get('window').width / 3 - 4;
 
-export default function PhotoGallery({ onOpenSettings}) {
+export default function PhotoGallery({ onOpenSettings, user }) {
   const [photos, setPhotos] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [bio, setBio] = useState('Splashing through life, one puddle at a time 💦');
+  const [editingBio, setEditingBio] = useState(false);
+  const [bioInput, setBioInput] = useState('');
+
+  const bioKey = `bio_${user?.id ?? 'guest'}`;
 
   useEffect(() => {
     getSavedPhotos().then(setPhotos);
+    // Load saved bio
+    AsyncStorage.getItem(bioKey).then(saved => {
+      if (saved) setBio(saved);
+    });
   }, []);
+
+  const saveBio = async () => {
+    const trimmed = bioInput.trim();
+    if (trimmed) {
+      setBio(trimmed);
+      await AsyncStorage.setItem(bioKey, trimmed);
+    }
+    setEditingBio(false);
+  };
 
   const handleDelete = (photo) => {
     Alert.alert('Delete Photo', 'Are you sure?', [
@@ -42,7 +60,7 @@ export default function PhotoGallery({ onOpenSettings}) {
     <View style={{ flex: 1, backgroundColor: '#e4e1d3' }}>
       {/* Header */}
       <View style={galleryStyles.header}>
-        <Image 
+        <Image
           source={require('./waddl/Pretty/Top_logo.png')}
           style={galleryStyles.logo}
           resizeMode="contain"
@@ -57,14 +75,53 @@ export default function PhotoGallery({ onOpenSettings}) {
       {/* Profile Section */}
       <View style={galleryStyles.profileSection}>
         <View style={galleryStyles.profilePic}>
-          <Image 
+          <Image
             source={require('./waddl/Pretty/waddl.png')}
             style={galleryStyles.profileImage}
             resizeMode="cover"
           />
         </View>
-        <Text style={galleryStyles.username}>@The_Real_Puddles</Text>
-        <Text style={galleryStyles.bio}>Splashing through life, one puddle at a time 💦</Text>
+        <Text style={galleryStyles.username}>@{user?.username ?? 'Unknown'}</Text>
+
+        {/* Bio */}
+        {editingBio ? (
+          <View style={galleryStyles.bioEditContainer}>
+            <TextInput
+              style={galleryStyles.bioInput}
+              value={bioInput}
+              onChangeText={setBioInput}
+              multiline
+              maxLength={100}
+              autoFocus
+              placeholder="Write your bio..."
+              placeholderTextColor="#999"
+            />
+            <View style={galleryStyles.bioEditButtons}>
+              <TouchableOpacity
+                style={galleryStyles.bioCancelBtn}
+                onPress={() => setEditingBio(false)}
+              >
+                <Text style={galleryStyles.bioCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={galleryStyles.bioSaveBtn}
+                onPress={saveBio}
+              >
+                <Text style={galleryStyles.bioSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={() => {
+              setBioInput(bio);
+              setEditingBio(true);
+            }}
+          >
+            <Text style={galleryStyles.bio}>{bio}</Text>
+            <Text style={galleryStyles.bioEditHint}>✏️ tap to edit</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Photos Grid */}
@@ -96,23 +153,23 @@ export default function PhotoGallery({ onOpenSettings}) {
           onRequestClose={() => setSelectedPhoto(null)}
         >
           <View style={styles.modalOverlay}>
-            <TouchableOpacity 
-              style={styles.modalCloseArea} 
+            <TouchableOpacity
+              style={styles.modalCloseArea}
               onPress={() => setSelectedPhoto(null)}
               activeOpacity={1}
             >
-              <Image 
-                source={{ uri: selectedPhoto.uri }} 
-                style={styles.fullImage} 
+              <Image
+                source={{ uri: selectedPhoto.uri }}
+                style={styles.fullImage}
                 resizeMode="contain"
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setSelectedPhoto(null)}
               >
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.downloadButton}
                 onPress={(e) => {
                   e.stopPropagation();
@@ -121,7 +178,7 @@ export default function PhotoGallery({ onOpenSettings}) {
               >
                 <Text style={styles.actionButtonText}>⬇</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.deleteButton}
                 onPress={(e) => {
                   e.stopPropagation();
@@ -143,28 +200,15 @@ const styles = StyleSheet.create({
   grid: { padding: 2 },
   thumb: { width: THUMB, height: THUMB * 1.4, margin: 2 },
   image: { width: '100%', height: '100%', borderRadius: 4 },
-  actions: {
-    position: 'absolute', bottom: 4, right: 4,
-    flexDirection: 'row', gap: 4
-  },
-  btn: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 6, padding: 4
-  },
-  deleteBtn: { backgroundColor: 'rgba(200,0,0,0.6)' },
-  btnText: { fontSize: 14, fontFamily: 'LilitaOne_400Regular' },
-  empty: { 
-    flex: 1, 
-    justifyContent: 'center', 
+  empty: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
   },
-  emptyIcon: {
-    fontSize: 80,
-    marginBottom: 15,
-  },
-  emptyText: { 
-    color: '#333', 
+  emptyIcon: { fontSize: 80, marginBottom: 15 },
+  emptyText: {
+    color: '#333',
     fontSize: 20,
     fontFamily: 'LilitaOne_400Regular',
     marginBottom: 8,
@@ -186,10 +230,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fullImage: {
-    width: '100%',
-    height: '80%',
-  },
+  fullImage: { width: '100%', height: '80%' },
   closeButton: {
     position: 'absolute',
     top: 50,
@@ -228,9 +269,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionButtonText: {
-    fontSize: 24,
-  },
+  actionButtonText: { fontSize: 24 },
 });
 
 const galleryStyles = StyleSheet.create({
@@ -243,10 +282,7 @@ const galleryStyles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  logo: {
-    height: 100,
-    width: 300,
-  },
+  logo: { height: 100, width: 300 },
   menuButton: {
     position: 'absolute',
     right: 20,
@@ -276,13 +312,7 @@ const galleryStyles = StyleSheet.create({
     marginBottom: 15,
     overflow: 'hidden',
   },
-  profileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  profileEmoji: {
-    fontSize: 75,
-  },
+  profileImage: { width: '100%', height: '100%' },
   username: {
     fontSize: 20,
     fontFamily: 'LilitaOne_400Regular',
@@ -294,27 +324,58 @@ const galleryStyles = StyleSheet.create({
     fontFamily: 'LilitaOne_400Regular',
     color: '#29412c',
     textAlign: 'center',
-    marginBottom: 20,
     paddingHorizontal: 40,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingHorizontal: 40,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 20,
+  bioEditHint: {
+    fontSize: 11,
     fontFamily: 'LilitaOne_400Regular',
-    color: '#000',
-    marginBottom: 4,
+    color: '#aaa',
+    textAlign: 'center',
+    marginTop: 4,
   },
-  statLabel: {
+  bioEditContainer: {
+    width: '80%',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bioInput: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 10,
     fontSize: 14,
     fontFamily: 'LilitaOne_400Regular',
-    color: '#666',
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#d0cdb8',
+    textAlign: 'center',
+    minHeight: 60,
+  },
+  bioEditButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  bioCancelBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#29412c',
+  },
+  bioCancelText: {
+    fontFamily: 'LilitaOne_400Regular',
+    color: '#29412c',
+    fontSize: 14,
+  },
+  bioSaveBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: '#29412c',
+  },
+  bioSaveText: {
+    fontFamily: 'LilitaOne_400Regular',
+    color: '#e4e1d3',
+    fontSize: 14,
   },
 });
