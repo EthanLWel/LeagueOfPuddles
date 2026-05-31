@@ -1,21 +1,24 @@
 import React, { useState, useRef } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
-import { savePhoto } from './photoStorage';
-import { View, Text, TouchableOpacity, Image, Linking, StyleSheet, PanResponder, Platform } from 'react-native';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, storage } from './firebase';
+import { View, Text, TouchableOpacity, Image, Linking, StyleSheet, PanResponder, Platform, ActivityIndicator } from 'react-native';
 
 export default function CameraScreen() {
   const [facing, setFacing] = useState('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [mediaPermission] = MediaLibrary.usePermissions();
-  const [photoUri, setPhotoUri] = useState(null);        // last saved (thumbnail)
-  const [previewUri, setPreviewUri] = useState(null);    // pending confirmation
+  const [photoUri, setPhotoUri] = useState(null);
+  const [previewUri, setPreviewUri] = useState(null);
   const [zoom, setZoom] = useState(0.1);
+  const [uploading, setUploading] = useState(false);
+  const [uploadDone, setUploadDone] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const cameraRef = useRef(null);
   const lastZoom = useRef(0);
   const lastDistance = useRef(null);
 
-  // --- pinch-to-zoom (unchanged) ---
   const getDistance = (touches) => {
     const [a, b] = touches;
     const dx = a.pageX - b.pageX;
@@ -47,29 +50,48 @@ export default function CameraScreen() {
     })
   ).current;
 
-  // --- capture: store preview, don't save yet ---
   const takePicture = async () => {
     if (!cameraRef.current) return;
     try {
+      // Web needs a short delay for the video feed to be ready
+      if (Platform.OS === 'web') {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8, exif: false });
-      setPreviewUri(photo.uri);   // show preview overlay
+      setPreviewUri(photo.uri);
+      setUploadDone(false);
     } catch (e) {
       console.error('takePicture error', e);
     }
   };
 
-  // --- user happy with the shot ---
+  // Upload photo to Firebase Storage
   const confirmPhoto = async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
+      console.error('No Firebase user logged in');
+      return;
+    }
+
+    setUploading(true);
     try {
-      await savePhoto(previewUri);
-      setPhotoUri(previewUri);    // update thumbnail
-      setPreviewUri(null);        // dismiss preview
+      const response = await fetch(previewUri);
+      const blob = await response.blob();
+      const filename = `${Date.now()}.jpg`;
+      const photoRef = ref(storage, `photos/${firebaseUser.uid}/${filename}`);
+      await uploadBytes(photoRef, blob);
+      await getDownloadURL(photoRef);
+
+      setPhotoUri(previewUri);
+      setUploadDone(true);
+      setPreviewUri(null);
     } catch (e) {
-      console.error('confirmPhoto error', e);
+      console.error('Upload error:', e);
+    } finally {
+      setUploading(false);
     }
   };
 
-  // --- user wants to try again ---
   const retakePhoto = () => {
     setPreviewUri(null);
   };
@@ -105,7 +127,6 @@ export default function CameraScreen() {
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <Image source={{ uri: previewUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
 
-        {/* Waddl logo */}
         <View style={styles.logoContainer}>
           <Image
             source={require('./waddl/Pretty/Top_logo.png')}
@@ -114,14 +135,17 @@ export default function CameraScreen() {
           />
         </View>
 
-        {/* Action buttons */}
         <View style={previewStyles.actions}>
-          <TouchableOpacity onPress={retakePhoto} style={previewStyles.retakeBtn}>
+          <TouchableOpacity onPress={retakePhoto} style={previewStyles.retakeBtn} disabled={uploading}>
             <Text style={previewStyles.retakeText}>Retake</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={confirmPhoto} style={previewStyles.useBtn}>
-            <Text style={previewStyles.useText}>Use Photo</Text>
+          <TouchableOpacity onPress={confirmPhoto} style={previewStyles.useBtn} disabled={uploading}>
+            {uploading ? (
+              <ActivityIndicator color="#e4e1d3" />
+            ) : (
+              <Text style={previewStyles.useText}>Use Photo</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -131,21 +155,21 @@ export default function CameraScreen() {
   // ── CAMERA SCREEN ───────────────────────────────────────────────
   return (
     <View style={{ flex: 1 }}>
-      <CameraView style={{ flex: 1 }} facing={facing} ref={cameraRef} ratio="16:9" zoom={zoom} />
+      <CameraView style={{ flex: 1 }} facing={facing} ref={cameraRef} ratio="16:9" zoom={zoom} onCameraReady={() => setCameraReady(true)} />
 
-      {/* Waddl Logo */}
       <View style={styles.logoContainer}>
         <Image
           source={require('./waddl/Pretty/Top_logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
+        {uploadDone && (
+          <Text style={styles.uploadedBadge}>✓ Photo saved!</Text>
+        )}
       </View>
 
-      {/* Pinch overlay */}
       <View style={StyleSheet.absoluteFill} {...pinchResponder.panHandlers} pointerEvents="box-only" />
 
-      {/* Zoom indicator */}
       {Platform.OS !== 'web' && (
         <View style={styles.zoomIndicator}>
           <Text style={styles.zoomLabel}>{zoomLabel}</Text>
@@ -155,7 +179,6 @@ export default function CameraScreen() {
         </View>
       )}
 
-      {/* Zoom buttons */}
       {Platform.OS !== 'web' && (
         <View style={styles.zoomContainer}>
           {[0, 0.1, 0.2].map((level) => {
@@ -180,7 +203,6 @@ export default function CameraScreen() {
         </View>
       )}
 
-      {/* Camera Controls */}
       <View style={styles.controls}>
         <TouchableOpacity
           style={styles.flipButton}
@@ -196,7 +218,7 @@ export default function CameraScreen() {
           <Text style={styles.flipIcon}>🔄</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={takePicture} style={styles.captureButton}>
+        <TouchableOpacity onPress={takePicture} style={[styles.captureButton, !cameraReady && { opacity: 0.4 }]} disabled={!cameraReady}>
           <Image
             source={require('./waddl/Pretty/Camera_button.png')}
             style={styles.captureButtonImage}
@@ -216,8 +238,6 @@ export default function CameraScreen() {
   );
 }
 
-// ── STYLES ───────────────────────────────────────────────────────
-
 const previewStyles = StyleSheet.create({
   actions: {
     position: 'absolute',
@@ -236,30 +256,22 @@ const previewStyles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.6)',
   },
-  retakeText: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: 'LilitaOne_400Regular',
-  },
+  retakeText: { color: 'white', fontSize: 18, fontFamily: 'LilitaOne_400Regular' },
   useBtn: {
     paddingVertical: 14,
     paddingHorizontal: 36,
     borderRadius: 30,
     backgroundColor: '#29412c',
+    minWidth: 120,
+    alignItems: 'center',
   },
-  useText: {
-    color: '#e4e1d3',
-    fontSize: 18,
-    fontFamily: 'LilitaOne_400Regular',
-  },
+  useText: { color: '#e4e1d3', fontSize: 18, fontFamily: 'LilitaOne_400Regular' },
 });
 
 const styles = StyleSheet.create({
   logoContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    top: 0, left: 0, right: 0,
     backgroundColor: '#29412c',
     paddingTop: 30,
     paddingBottom: 10,
@@ -268,91 +280,35 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 20,
   },
   logo: { height: 100, width: 300 },
+  uploadedBadge: {
+    color: '#a8e6a3',
+    fontSize: 13,
+    fontFamily: 'LilitaOne_400Regular',
+    marginTop: 4,
+  },
   zoomIndicator: {
-    position: 'absolute',
-    top: 160,
-    alignSelf: 'center',
-    alignItems: 'center',
-    gap: 4,
+    position: 'absolute', top: 160,
+    alignSelf: 'center', alignItems: 'center', gap: 4,
   },
   zoomLabel: {
-    color: 'white',
-    fontSize: 16,
-    fontFamily: 'LilitaOne_400Regular',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    color: 'white', fontSize: 16, fontFamily: 'LilitaOne_400Regular',
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
-  zoomBarTrack: {
-    width: 120,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  zoomBarFill: {
-    height: '100%',
-    backgroundColor: '#e4e1d3',
-    borderRadius: 2,
-  },
-  zoomContainer: {
-    position: 'absolute',
-    bottom: 120,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  zoomBtn: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  zoomBtnActive: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderColor: 'white',
-  },
+  zoomBarTrack: { width: 120, height: 4, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, overflow: 'hidden' },
+  zoomBarFill: { height: '100%', backgroundColor: '#e4e1d3', borderRadius: 2 },
+  zoomContainer: { position: 'absolute', bottom: 120, width: '100%', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  zoomBtn: { backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'transparent' },
+  zoomBtnActive: { backgroundColor: 'rgba(255,255,255,0.25)', borderColor: 'white' },
   zoomBtnDisabled: { opacity: 0.3 },
   zoomTextDisabled: { color: 'rgba(255,255,255,0.3)' },
-  zoomText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
-    fontFamily: 'LilitaOne_400Regular',
-  },
+  zoomText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontFamily: 'LilitaOne_400Regular' },
   zoomTextActive: { color: 'white' },
-  controls: {
-    position: 'absolute',
-    bottom: 40,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: 30,
-  },
-  flipButton: {
-    width: 50, height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  controls: { position: 'absolute', bottom: 40, width: '100%', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 30 },
+  flipButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   flipIcon: { fontSize: 24 },
-  captureButton: {
-    width: 80, height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  captureButton: { width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
   captureButtonImage: { width: 80, height: 80 },
-  thumbnail: {
-    width: 50, height: 50,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'white',
-  },
+  thumbnail: { width: 50, height: 50, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'white' },
   thumbnailImage: { width: '100%', height: '100%' },
   thumbnailPlaceholder: { width: 50, height: 50 },
 });

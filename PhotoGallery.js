@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { storage, db } from './firebase';
+import { auth, storage, db } from './firebase';
 
 const THUMB = Dimensions.get('window').width / 3 - 4;
 
@@ -19,15 +19,22 @@ export default function PhotoGallery({ onOpenSettings, user }) {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    loadPhotos();
-    loadBio();
+    // Wait for Firebase auth to be ready before loading
+    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+      if (firebaseUser) {
+        loadPhotos(firebaseUser.uid);
+        loadBio(firebaseUser.uid);
+      } else {
+        setLoadingPhotos(false);
+      }
+    });
+    return unsubscribe;
   }, []);
 
-  // Load all photos for this user from Firebase Storage
-  const loadPhotos = async () => {
+  const loadPhotos = async (uid) => {
     setLoadingPhotos(true);
     try {
-      const userPhotosRef = ref(storage, `photos/${user.id}/`);
+      const userPhotosRef = ref(storage, `photos/${uid}/`);
       const result = await listAll(userPhotosRef);
       const urls = await Promise.all(
         result.items.map(async (item) => {
@@ -43,10 +50,9 @@ export default function PhotoGallery({ onOpenSettings, user }) {
     }
   };
 
-  // Load bio from Firestore
-  const loadBio = async () => {
+  const loadBio = async (uid) => {
     try {
-      const userDoc = await getDoc(doc(db, 'users', user.id));
+      const userDoc = await getDoc(doc(db, 'users', uid));
       if (userDoc.exists() && userDoc.data().bio) {
         setBio(userDoc.data().bio);
       }
@@ -55,14 +61,15 @@ export default function PhotoGallery({ onOpenSettings, user }) {
     }
   };
 
-  // Upload a photo URI to Firebase Storage
   const uploadPhoto = async (uri) => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return;
     setUploading(true);
     try {
       const response = await fetch(uri);
       const blob = await response.blob();
       const filename = `${Date.now()}.jpg`;
-      const photoRef = ref(storage, `photos/${user.id}/${filename}`);
+      const photoRef = ref(storage, `photos/${firebaseUser.uid}/${filename}`);
       await uploadBytes(photoRef, blob);
       const url = await getDownloadURL(photoRef);
       setPhotos(prev => [...prev, { uri: url, ref: photoRef.fullPath }]);
@@ -73,13 +80,13 @@ export default function PhotoGallery({ onOpenSettings, user }) {
     }
   };
 
-  // Save bio to Firestore
   const saveBio = async () => {
+    const firebaseUser = auth.currentUser;
     const trimmed = bioInput.trim();
-    if (trimmed) {
+    if (trimmed && firebaseUser) {
       setBio(trimmed);
       try {
-        await updateDoc(doc(db, 'users', user.id), { bio: trimmed });
+        await updateDoc(doc(db, 'users', firebaseUser.uid), { bio: trimmed });
       } catch (e) {
         console.error('Failed to save bio:', e);
       }
@@ -87,7 +94,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
     setEditingBio(false);
   };
 
-  // Delete photo from Firebase Storage
   const handleDelete = (photo) => {
     Alert.alert('Delete Photo', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
@@ -109,6 +115,7 @@ export default function PhotoGallery({ onOpenSettings, user }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#e4e1d3' }}>
+
       {/* Header */}
       <View style={galleryStyles.header}>
         <Image
@@ -223,7 +230,6 @@ export default function PhotoGallery({ onOpenSettings, user }) {
   );
 }
 
-// Export uploadPhoto so your camera screen can call it
 export { };
 
 const styles = StyleSheet.create({
@@ -235,14 +241,9 @@ const styles = StyleSheet.create({
   emptyText: { color: '#333', fontSize: 20, fontFamily: 'LilitaOne_400Regular' },
   emptySubtext: { color: '#999', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
   uploadingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#d6ecd8',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#b0d4b4',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#d6ecd8', paddingVertical: 8, paddingHorizontal: 16,
+    borderBottomWidth: 1, borderBottomColor: '#b0d4b4',
   },
   uploadingText: { fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#29412c' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
@@ -251,15 +252,13 @@ const styles = StyleSheet.create({
   closeButton: {
     position: 'absolute', top: 50, right: 20,
     width: 50, height: 50, borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center',
   },
   closeButtonText: { color: 'white', fontSize: 28, fontFamily: 'LilitaOne_400Regular' },
   deleteButton: {
     position: 'absolute', bottom: 80, right: 30,
     width: 55, height: 55, borderRadius: 27.5,
-    backgroundColor: 'rgba(200,0,0,0.85)',
-    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(200,0,0,0.85)', justifyContent: 'center', alignItems: 'center',
   },
   actionButtonText: { fontSize: 24 },
 });

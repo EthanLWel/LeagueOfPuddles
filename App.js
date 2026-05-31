@@ -4,6 +4,8 @@ import { StyleSheet, View, Image, TouchableOpacity, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import { useFonts, LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './firebase';
 import HomeFeed from './HomeFeed';
 import CameraScreen from './Camera';
 import MapScreen from './MapScreen';
@@ -12,7 +14,6 @@ import Settings from './Settings';
 import AuthScreen from './AuthScreen';
 
 const TODAY_KEY = 'last_opened_date';
-const USER_KEY = 'logged_in_user';
 const PHOTOS_DIR = FileSystem.documentDirectory + 'photos/';
 
 function getTodayString() {
@@ -24,58 +25,61 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [showSettings, setShowSettings] = useState(false);
   const [dailyResetKey, setDailyResetKey] = useState(null);
-  const [user, setUser] = useState(null); // { id, username }
+  const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  const [fontsLoaded] = useFonts({
-    LilitaOne_400Regular,
-  });
+  const [fontsLoaded] = useFonts({ LilitaOne_400Regular });
 
+  // Listen to Firebase auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          id: firebaseUser.uid,
+          username: firebaseUser.displayName || firebaseUser.email,
+          email: firebaseUser.email,
+        });
+      } else {
+        setUser(null);
+      }
+      setAuthChecked(true);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Daily reset logic
   useEffect(() => {
     (async () => {
-      // Check for saved login
-      try {
-        const saved = await AsyncStorage.getItem(USER_KEY);
-        if (saved) setUser(JSON.parse(saved));
-      } catch (e) {}
-
       const today = getTodayString();
       const lastOpened = await AsyncStorage.getItem(TODAY_KEY);
-      
+
       if (lastOpened !== today) {
-        // New day - clear all photos
         try {
           const dirInfo = await FileSystem.getInfoAsync(PHOTOS_DIR);
           if (dirInfo.exists) {
             await FileSystem.deleteAsync(PHOTOS_DIR, { idempotent: true });
           }
-        } catch (e) {
-          console.log('Error clearing photos:', e);
-        }
+        } catch (e) {}
 
-        // Clear daily pin
         try {
           if (typeof localStorage !== 'undefined') localStorage.removeItem('daily_pin');
           await AsyncStorage.removeItem('daily_pin');
         } catch (e) {}
-        
+
         await AsyncStorage.setItem(TODAY_KEY, today);
         setDailyResetKey(today);
       } else {
         setDailyResetKey(today);
       }
-
-      setAuthChecked(true);
     })();
   }, []);
 
-  const handleAuth = async (userData) => {
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
+  const handleAuth = (userData) => {
     setUser(userData);
   };
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem(USER_KEY);
+    await signOut(auth);
     setUser(null);
     setCurrentScreen('home');
   };
@@ -92,13 +96,10 @@ export default function App() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
+
       {currentScreen === 'home' && <HomeFeed user={user} />}
-      
       {currentScreen === 'camera' && <CameraScreen user={user} />}
-      
       {currentScreen === 'maps' && <MapScreen key={dailyResetKey} />}
-      
       {currentScreen === 'gallery' && (
         showSettings ? (
           <Settings onBack={() => setShowSettings(false)} onLogout={handleLogout} user={user} />
@@ -107,64 +108,40 @@ export default function App() {
         )
       )}
 
-      {/* Bottom Navigation Bar */}
-      <View style={[
-        styles.bottomNav,
-        currentScreen === 'camera' && styles.bottomNavFlat
-      ]}>
-        <TouchableOpacity 
-          style={styles.navButton}
-          onPress={() => navigateTo('home')}
-        >
-          <Image 
-            source={currentScreen === 'home' 
+      <View style={[styles.bottomNav, currentScreen === 'camera' && styles.bottomNavFlat]}>
+        <TouchableOpacity style={styles.navButton} onPress={() => navigateTo('home')}>
+          <Image
+            source={currentScreen === 'home'
               ? require('./waddl/Pretty/Home_Highlighted.png')
-              : require('./waddl/Pretty/Home_unhighlighted.png')
-            }
-            style={styles.navIcon}
-            resizeMode="contain"
+              : require('./waddl/Pretty/Home_unhighlighted.png')}
+            style={styles.navIcon} resizeMode="contain"
           />
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.navButton}
-          onPress={() => navigateTo('camera')}
-        >
-          <Image 
+        <TouchableOpacity style={styles.navButton} onPress={() => navigateTo('camera')}>
+          <Image
             source={currentScreen === 'camera'
               ? require('./waddl/Pretty/Camera_highlighted.png')
-              : require('./waddl/Pretty/Camera_Unhighted.png')
-            }
-            style={styles.navIcon}
-            resizeMode="contain"
+              : require('./waddl/Pretty/Camera_Unhighted.png')}
+            style={styles.navIcon} resizeMode="contain"
           />
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.navButton}
-          onPress={() => navigateTo('maps')}
-        >
-          <Image 
+        <TouchableOpacity style={styles.navButton} onPress={() => navigateTo('maps')}>
+          <Image
             source={currentScreen === 'maps'
               ? require('./waddl/Pretty/Map_highlighted.png')
-              : require('./waddl/Pretty/Maps_unhighlighted.png')
-            }
-            style={styles.navIcon}
-            resizeMode="contain"
+              : require('./waddl/Pretty/Maps_unhighlighted.png')}
+            style={styles.navIcon} resizeMode="contain"
           />
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.navButton}
-          onPress={() => navigateTo('gallery')}
-        >
-          <Image 
+        <TouchableOpacity style={styles.navButton} onPress={() => navigateTo('gallery')}>
+          <Image
             source={currentScreen === 'gallery'
               ? require('./waddl/Pretty/Profile_highlighted.png')
-              : require('./waddl/Pretty/Account_unhighlighted.png')
-            }
-            style={styles.navIcon}
-            resizeMode="contain"
+              : require('./waddl/Pretty/Account_unhighlighted.png')}
+            style={styles.navIcon} resizeMode="contain"
           />
         </TouchableOpacity>
       </View>
@@ -173,10 +150,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#e4e1d3',
-  },
+  container: { flex: 1, backgroundColor: '#e4e1d3' },
   bottomNav: {
     flexDirection: 'row',
     backgroundColor: '#29412c',
@@ -189,17 +163,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
-  bottomNavFlat: {
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-  },
-  navButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 10,
-  },
-  navIcon: {
-    width: 55,
-    height: 55,
-  },
+  bottomNavFlat: { borderTopLeftRadius: 0, borderTopRightRadius: 0 },
+  navButton: { alignItems: 'center', justifyContent: 'center', padding: 10 },
+  navIcon: { width: 55, height: 55 },
 });
