@@ -9,7 +9,8 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { ref, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from './firebase';
 
 export default function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState('login');
@@ -72,12 +73,22 @@ export default function AuthScreen({ onAuth }) {
         // Set display name
         await updateProfile(cred.user, { displayName: username.trim() });
 
+        // Fetch the default pfp URL from Storage
+        let defaultPfpUrl = null;
+        try {
+          defaultPfpUrl = await getDownloadURL(ref(storage, 'photos/default.png'));
+        } catch (e) {
+          // If the file doesn't exist yet, just leave pfpUrl null
+          console.warn('Default pfp not found in Storage:', e.message);
+        }
+
         // Save user profile to Firestore
         await setDoc(doc(db, 'users', cred.user.uid), {
           uid: cred.user.uid,
           username: username.trim(),
           email: email.trim(),
           bio: 'Splashing through life, one puddle at a time 💦',
+          pfpUrl: defaultPfpUrl,
           createdAt: new Date().toISOString(),
         });
 
@@ -205,7 +216,7 @@ export default function AuthScreen({ onAuth }) {
             </TouchableOpacity>
           </ImageBackground>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.switchContainer}
             onPress={() => switchMode(mode === 'login' ? 'register' : 'login')}
           >
