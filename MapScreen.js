@@ -217,9 +217,16 @@ export default function MapScreen() {
               {searching ? (
                 <ActivityIndicator size="small" color="#e4e1d3" />
               ) : (
-                <Text style={styles.dropBtnText}>
-                  {pinInfo ? '🔄 Find New Destination' : '📍 Find Destination'}
-                </Text>
+                <View style={styles.dropBtnContent}>
+                  <Image
+                    source={require('./waddl/Prettier/Flip.png')}
+                    style={styles.flipImage}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.dropBtnText}>
+                    {pinInfo ? 'Find New Destination' : 'Find Destination'}
+                  </Text>
+                </View>
               )}
             </TouchableOpacity>
 
@@ -282,6 +289,8 @@ const styles = StyleSheet.create({
   controls: { backgroundColor: '#e4e1d3', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#d0cdb8', gap: 10 },
   dropBtn: { backgroundColor: '#29412c', paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   dropBtnDisabled: { backgroundColor: '#aaa' },
+  dropBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  flipImage: { width: 24, height: 24 },
   dropBtnText: { color: '#e4e1d3', fontFamily: 'LilitaOne_400Regular', fontSize: 15 },
   routeInfo: { flexDirection: 'row', gap: 16 },
   routeInfoText: { fontSize: 13, fontFamily: 'LilitaOne_400Regular', color: '#333' },
