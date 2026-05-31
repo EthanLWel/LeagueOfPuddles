@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text, ActivityIndicator, Image, Modal, ScrollView, Alert } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -47,6 +47,9 @@ export default function MapScreen() {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [sharedWith, setSharedWith] = useState(null);
+  const locationSubscription = useRef(null);
+  const initializedRef = useRef(false);
+  const isSharedPin = useRef(false);
 
   const getRadius = async () => {
     const val = await AsyncStorage.getItem(RADIUS_KEY);
@@ -70,7 +73,6 @@ export default function MapScreen() {
     }
   };
 
-  // Returns the shared destination pin if found, or null
   const checkAcceptedPinShare = async () => {
     try {
       const uid = auth.currentUser?.uid;
@@ -93,7 +95,6 @@ export default function MapScreen() {
       await AsyncStorage.setItem(SHARED_PIN_KEY, getTodayString());
       await deleteDoc(doc(db, 'pinRequests', snap.docs[0].id));
 
-      // Return the destination so we can re-route from the recipient's location
       return data.sharedPin;
     } catch (e) {
       console.error('Error checking shared pin:', e);
@@ -105,10 +106,11 @@ export default function MapScreen() {
     try {
       const saved = await AsyncStorage.getItem(PIN_KEY);
       if (saved) {
-        const { date, pin, distance, duration, path } = JSON.parse(saved);
+        const { date, pin, distance, duration, path, fromShare } = JSON.parse(saved);
         if (date === getTodayString()) {
           setPinInfo({ pin, distance, duration });
           setPolylinePath(path ?? null);
+          if (fromShare) isSharedPin.current = true;
           return true;
         }
       }
@@ -123,18 +125,6 @@ export default function MapScreen() {
       const uid = auth.currentUser?.uid;
       const userDoc = await getDoc(doc(db, 'users', uid));
       const myUsername = userDoc.exists() ? userDoc.data().username : 'someone';
-
-      const existing = await getDocs(query(
-        collection(db, 'pinRequests'),
-        where('fromUid', '==', uid),
-        where('toUid', '==', friend.uid),
-        where('date', '==', getTodayString())
-      ));
-      if (!existing.empty) {
-        Alert.alert('Already sent', `You already sent a pin request to @${friend.username} today.`);
-        setSharing(false);
-        return;
-      }
 
       await addDoc(collection(db, 'pinRequests'), {
         fromUid: uid,
@@ -160,10 +150,10 @@ export default function MapScreen() {
     }
   };
 
-  // Routes from the user's current location to a fixed destination (used for shared pins)
   const dropPinToDestination = async (loc, destination) => {
     setSearching(true);
     setSearchError(null);
+    isSharedPin.current = true;
     try {
       const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
         method: 'POST',
@@ -196,6 +186,7 @@ export default function MapScreen() {
         distance: `${distanceMiles} mi`,
         duration: durationText,
         path,
+        fromShare: true,
       }));
     } catch (e) {
       console.error('Failed to route to shared destination:', e);
@@ -205,6 +196,15 @@ export default function MapScreen() {
   };
 
   const dropPin = async (currentCenter) => {
+    // Don't overwrite a shared pin with a radius-based one
+    if (isSharedPin.current) {
+      Alert.alert(
+        'Shared Pin Active',
+        `You're walking to a pin shared by @${sharedWith ?? 'a friend'} today. Come back tomorrow to find your own destination!`
+      );
+      return;
+    }
+
     const loc = currentCenter || center;
     if (!loc) return;
     setSearching(true);
@@ -312,30 +312,61 @@ export default function MapScreen() {
         const sharedDestination = await checkAcceptedPinShare();
 
         const { status } = await Location.requestForegroundPermissionsAsync();
-        let coords;
+
         if (status !== 'granted') {
           setLocationError('Location access denied. Showing default location.');
-          coords = DEFAULT_COORDS;
-        } else {
-          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
-        }
-        setCenter(coords);
-        setLoading(false);
+          setCenter(DEFAULT_COORDS);
+          setLoading(false);
 
-        if (sharedDestination) {
-          await dropPinToDestination(coords, sharedDestination);
-        } else {
-          const hasSavedPin = await loadSavedPin();
-          if (!hasSavedPin) await dropPin(coords);
+          if (!initializedRef.current) {
+            initializedRef.current = true;
+            if (sharedDestination) {
+              await dropPinToDestination(DEFAULT_COORDS, sharedDestination);
+            } else {
+              const hasSavedPin = await loadSavedPin();
+              if (!hasSavedPin) await dropPin(DEFAULT_COORDS);
+            }
+          }
+          return;
         }
+
+        locationSubscription.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 5000,
+            distanceInterval: 10,
+          },
+          async (loc) => {
+            const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+            setCenter(coords);
+            setLoading(false);
+
+            if (!initializedRef.current) {
+              initializedRef.current = true;
+              if (sharedDestination) {
+                await dropPinToDestination(coords, sharedDestination);
+              } else {
+                const hasSavedPin = await loadSavedPin();
+                if (!hasSavedPin) await dropPin(coords);
+              }
+            }
+          }
+        );
       } catch (e) {
         setLocationError('Could not get location.');
         setCenter(DEFAULT_COORDS);
         setLoading(false);
-        await dropPin(DEFAULT_COORDS);
+
+        if (!initializedRef.current) {
+          initializedRef.current = true;
+          await dropPin(DEFAULT_COORDS);
+        }
       }
     })();
+
+    return () => {
+      locationSubscription.current?.remove();
+    };
   }, []);
 
   return (
@@ -384,7 +415,7 @@ export default function MapScreen() {
                       resizeMode="contain"
                     />
                     <Text style={styles.dropBtnText}>
-                      {pinInfo ? 'Find New Destination' : 'Find Destination'}
+                      {isSharedPin.current ? 'Shared Destination' : pinInfo ? 'Find New Destination' : 'Find Destination'}
                     </Text>
                   </View>
                 )}
