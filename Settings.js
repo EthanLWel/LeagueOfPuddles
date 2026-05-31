@@ -16,11 +16,9 @@ export default function Settings({ onBack, onLogout, user }) {
   useEffect(() => {
     (async () => {
       try {
-        // Load radius
         const savedRadius = await AsyncStorage.getItem(RADIUS_KEY);
         if (savedRadius !== null) setRadius(parseFloat(savedRadius));
 
-        // Load per-user prefs
         const savedPrefs = await AsyncStorage.getItem(prefsKey);
         if (savedPrefs) {
           const { notificationsEnabled: n, darkMode: d } = JSON.parse(savedPrefs);
@@ -49,7 +47,7 @@ export default function Settings({ onBack, onLogout, user }) {
   };
 
   const updateRadius = (newRadius) => {
-    const clamped = Math.max(0.5, parseFloat(newRadius.toFixed(2)));
+    const clamped = Math.max(0, parseFloat(newRadius.toFixed(2)));
     setRadius(clamped);
     AsyncStorage.setItem(RADIUS_KEY, String(clamped));
   };
@@ -76,7 +74,6 @@ export default function Settings({ onBack, onLogout, user }) {
         <View style={styles.placeholder} />
       </View>
 
-      {/* Profile section */}
       <View style={styles.profileSection}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -92,11 +89,19 @@ export default function Settings({ onBack, onLogout, user }) {
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Walk Radius</Text>
           <View style={styles.radiusRow}>
-            <TouchableOpacity style={styles.radiusBtn} onPress={() => updateRadius(radius - 0.5)}>
+            <TouchableOpacity
+              style={styles.radiusBtn}
+              onPress={() => updateRadius(radius - 0.5)}
+            >
               <Text style={styles.radiusBtnText}>−</Text>
             </TouchableOpacity>
-            <Text style={styles.radiusValue}>{radius} mi</Text>
-            <TouchableOpacity style={styles.radiusBtn} onPress={() => updateRadius(radius + 0.5)}>
+            <Text style={styles.radiusValue}>
+              {radius === 0 ? 'Here' : `${radius} mi`}
+            </Text>
+            <TouchableOpacity
+              style={styles.radiusBtn}
+              onPress={() => updateRadius(radius + 0.5)}
+            >
               <Text style={styles.radiusBtnText}>+</Text>
             </TouchableOpacity>
           </View>

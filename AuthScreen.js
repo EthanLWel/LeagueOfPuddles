@@ -11,6 +11,7 @@ export default function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -27,11 +28,31 @@ export default function AuthScreen({ onAuth }) {
     await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
   };
 
+  const switchMode = (newMode) => {
+    setMode(newMode);
+    setError(null);
+    setUsername('');
+    setPassword('');
+    setConfirmPassword('');
+  };
+
   const submit = async () => {
     if (!username.trim() || !password.trim()) {
       setError('Please enter a username and password');
       return;
     }
+
+    if (mode === 'register') {
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+      if (password.length < 4) {
+        setError('Password must be at least 4 characters');
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 
@@ -78,7 +99,9 @@ export default function AuthScreen({ onAuth }) {
           resizeMode="contain"
         />
 
-        <Text style={styles.title}>{mode === 'login' ? 'Welcome back!' : 'Create account'}</Text>
+        <Text style={styles.title}>
+          {mode === 'login' ? 'Welcome back!' : 'Create account'}
+        </Text>
 
         <TextInput
           style={styles.input}
@@ -97,6 +120,21 @@ export default function AuthScreen({ onAuth }) {
           onChangeText={setPassword}
         />
 
+        {mode === 'register' && (
+          <TextInput
+            style={[
+              styles.input,
+              confirmPassword.length > 0 && password !== confirmPassword && styles.inputError,
+              confirmPassword.length > 0 && password === confirmPassword && styles.inputSuccess,
+            ]}
+            placeholder="Confirm Password"
+            placeholderTextColor="#999"
+            secureTextEntry
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+          />
+        )}
+
         {error && <Text style={styles.error}>{error}</Text>}
 
         <TouchableOpacity
@@ -110,7 +148,7 @@ export default function AuthScreen({ onAuth }) {
           }
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null); }}>
+        <TouchableOpacity onPress={() => switchMode(mode === 'login' ? 'register' : 'login')}>
           <Text style={styles.switchText}>
             {mode === 'login' ? "Don't have an account? Register" : 'Already have an account? Log in'}
           </Text>
@@ -136,6 +174,12 @@ const styles = StyleSheet.create({
     color: '#333',
     borderWidth: 1,
     borderColor: '#d0cdb8',
+  },
+  inputError: {
+    borderColor: '#c0392b',
+  },
+  inputSuccess: {
+    borderColor: '#29412c',
   },
   error: { color: '#c00', fontSize: 13, fontFamily: 'LilitaOne_400Regular', textAlign: 'center' },
   btn: {

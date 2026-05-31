@@ -33,7 +33,7 @@ const getRadius = () => {
   return val !== null ? parseFloat(val) : DEFAULT_RADIUS;
 };
 
-export default function MapScreen({ onBack }) {
+export default function MapScreen() {
   const [center, setCenter] = useState(null);
   const [directions, setDirections] = useState(null);
   const [pinInfo, setPinInfo] = useState(null);
@@ -50,7 +50,7 @@ export default function MapScreen({ onBack }) {
         const { date, pin, distance, duration, path } = JSON.parse(saved);
         if (date === getTodayString()) {
           setPinInfo({ pin, distance, duration });
-          setDirections({ path });
+          setDirections(path ? { path } : null);
           return true;
         }
       }
@@ -65,6 +65,22 @@ export default function MapScreen({ onBack }) {
     setSearchError(null);
 
     const radius = getRadius();
+
+    // Radius 0 — just pin current location
+    if (radius === 0) {
+      setPinInfo({ pin: loc, distance: '0 mi', duration: '0 min' });
+      setDirections(null);
+      localStorage.setItem(PIN_KEY, JSON.stringify({
+        date: getTodayString(),
+        pin: loc,
+        distance: '0 mi',
+        duration: '0 min',
+        path: null,
+      }));
+      setSearching(false);
+      return;
+    }
+
     const targetMeters = radius * 1609.34;
     const toleranceMeters = 0.25 * 1609.34;
     const bearing = Math.random() * 2 * Math.PI;
