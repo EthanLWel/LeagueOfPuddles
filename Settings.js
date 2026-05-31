@@ -140,7 +140,7 @@ export default function Settings({ onBack, onLogout, user }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <Image source={require('./waddl/Prettier/Arrow.png')} style={styles.backArrow} resizeMode="contain" />
         </TouchableOpacity>
         <Image
           source={require('./waddl/Prettier/New_name.png')}
@@ -276,6 +276,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20, borderBottomRightRadius: 20,
   },
   backBtn: { width: 60 },
+  backArrow: { width: 40, height: 40 },
   backText: { color: 'white', fontSize: 16, fontFamily: 'LilitaOne_400Regular' },
   logo: { height: 90, width: 240 },
   placeholder: { width: 60 },
